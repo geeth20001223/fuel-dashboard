@@ -32,6 +32,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .btn-gray{background:#f0f0f0;color:#444;border:1px solid #ddd}
 .btn-gray:hover{background:#e5e5e5}
 .btn-sm{padding:5px 12px;font-size:11px}
+.dedup-bar{background:#fff8e1;border-bottom:1px solid #ffe082;padding:7px 24px;font-size:12px;color:#795548;display:none;align-items:center;gap:8px}
+.dedup-bar.show{display:flex}
+.dedup-icon{font-size:14px}
 .main{padding:20px 24px;max-width:1400px;margin:0 auto}
 .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
 .metric-card{background:white;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.07);transition:transform .2s}
@@ -64,6 +67,8 @@ thead th:hover{color:#c0392b}
 tbody td{padding:10px 14px;border-bottom:1px solid #f5f5f5;font-size:13px;color:#333;vertical-align:middle}
 tbody tr:hover td{background:#fff8f8}
 tbody tr:last-child td{border-bottom:none}
+tbody tr.is-dup td{background:#fffde7}
+tbody tr.is-dup td:first-child::after{content:' ⚠ dup';font-size:10px;color:#f39c12;font-weight:600}
 .badge{display:inline-block;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:600}
 .badge-diesel{background:#fef3cd;color:#856404}
 .badge-super{background:#fde8d8;color:#7a3000}
@@ -118,14 +123,26 @@ tbody tr:last-child td{border-bottom:none}
 
 <div class="url-bar">
   <span class="url-label">Google Sheet CSV URL:</span>
-  <input class="url-input" id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/e/2PACX-1vTCYJjyAjtAGT4seFkcRZmvdScTs0BYnfy8s905dMYkcKDQBEJL5OzxmR7v98ZDvGVlrO9j0l_h87gN/pub?output=csv"/>
+  <input class="url-input" id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv"/>
   <button class="btn btn-red" onclick="loadData()"><span id="loadBtnText">Load Sheet</span></button>
   <button class="btn btn-gray" onclick="loadDemo()">Load Demo</button>
 </div>
 
+<!-- Duplicate warning bar -->
+<div class="dedup-bar" id="dedupBar">
+  <span class="dedup-icon">⚠️</span>
+  <span id="dedupMsg"></span>
+  <span style="margin-left:auto;display:flex;gap:8px">
+    <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-weight:500">
+      <input type="checkbox" id="dedupToggle" onchange="toggleDedup()" style="cursor:pointer"/>
+      Show unique institutions only (keep latest per institution)
+    </label>
+  </span>
+</div>
+
 <div class="main">
   <div class="metrics">
-    <div class="metric-card"><div class="metric-label">Institutions</div><div class="metric-value mv-blue" id="m-inst">—</div><div class="metric-sub">reporting</div></div>
+    <div class="metric-card"><div class="metric-label">Institutions</div><div class="metric-value mv-blue" id="m-inst">—</div><div class="metric-sub" id="m-inst-sub">reporting</div></div>
     <div class="metric-card"><div class="metric-label">Total Ambulances</div><div class="metric-value mv-red" id="m-amb">—</div><div class="metric-sub">operational</div></div>
     <div class="metric-card"><div class="metric-label">Diesel / Week</div><div class="metric-value mv-amber" id="m-diesel">—</div><div class="metric-sub">litres (ambulances)</div></div>
     <div class="metric-card"><div class="metric-label">Petrol / Week</div><div class="metric-value mv-green" id="m-petrol">—</div><div class="metric-sub">litres (ambulances)</div></div>
@@ -170,168 +187,230 @@ tbody tr:last-child td{border-bottom:none}
 
 <script>
 // ══════════════════════════════════════════════════════
-// YOUR GOOGLE SHEET CSV URL
-// To change: replace the URL below with your new CSV URL
+// CONFIG
 // ══════════════════════════════════════════════════════
 const DEFAULT_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTCYJjyAjtAGT4seFkcRZmvdScTs0BYnfy8s905dMYkcKDQBEJL5OzxmR7v98ZDvGVlrO9j0l_h87gN/pub?output=csv';
-
 const REFRESH_MS = 5000;
 
-let allRows=[], filtered=[], currentTab='inst', page=1;
-const PAGE_SIZE=12;
-let sortCol=null, sortDir=1, charts={}, refreshTimer=null, countdownTimer=null, countdownVal=5;
+let allRows = [];        // raw rows from sheet (ALL, including duplicates)
+let activeRows = [];     // rows actually used for metrics/charts (deduped if toggled)
+let dupSet = new Set();  // indices of rows that are duplicates (not the latest)
+let filtered = [];
+let currentTab = 'inst', page = 1;
+const PAGE_SIZE = 12;
+let sortCol = null, sortDir = 1, charts = {}, refreshTimer = null, countdownTimer = null, countdownVal = 5;
+let dedupEnabled = false;
 
 // ── INIT ──
-window.onload=()=>{
-  document.getElementById('sheetUrl').value=DEFAULT_URL;
+window.onload = () => {
+  document.getElementById('sheetUrl').value = DEFAULT_URL;
   loadData();
 };
 
 // ── COUNTDOWN ──
-function startCountdown(){
-  if(countdownTimer)clearInterval(countdownTimer);
-  countdownVal=Math.round(REFRESH_MS/1000);
-  document.getElementById('countdown').textContent=countdownVal;
-  countdownTimer=setInterval(()=>{
+function startCountdown() {
+  if (countdownTimer) clearInterval(countdownTimer);
+  countdownVal = Math.round(REFRESH_MS / 1000);
+  document.getElementById('countdown').textContent = countdownVal;
+  countdownTimer = setInterval(() => {
     countdownVal--;
-    if(countdownVal<=0)countdownVal=Math.round(REFRESH_MS/1000);
-    document.getElementById('countdown').textContent=countdownVal;
-  },1000);
+    if (countdownVal <= 0) countdownVal = Math.round(REFRESH_MS / 1000);
+    document.getElementById('countdown').textContent = countdownVal;
+  }, 1000);
 }
 
 // ══════════════════════════════════════════════════════
-// FIX 1: CSV PARSER
-// Handles \r\n (Windows), \r (old Mac), \n (Unix)
-// Never drops valid rows
+// FIX 1: ROBUST NUMERIC PARSER
+// Handles: "300L", "225 Liter", "250 Liter", "65 liters",
+//          "250-300" (takes first number), "00", empty, null
 // ══════════════════════════════════════════════════════
-function parseCsv(text){
-  // Normalize ALL line endings first
-  const clean = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim();
+function n(v) {
+  if (v === null || v === undefined) return 0;
+  const s = String(v).trim();
+  if (!s || s === '0' || s === '00' || s.toLowerCase() === 'no' || s.toLowerCase() === 'n/a' || s === '-' || s === 'NA') return 0;
+  // Strip non-numeric suffixes (L, Liter, Litre, liters, litres, kVA, etc.)
+  // Also handle ranges like "250-300" → take first number
+  const cleaned = s.replace(/[^0-9.\-]/g, ' ').trim();
+  // If range (e.g. "250 300"), take first
+  const first = cleaned.split(/\s+/)[0];
+  const x = parseFloat(first);
+  return isNaN(x) ? 0 : x;
+}
+
+// ══════════════════════════════════════════════════════
+// FIX 2: ROBUST CSV PARSER
+// Handles \r\n, \r, \n; quoted fields; embedded commas
+// ══════════════════════════════════════════════════════
+function parseCsv(text) {
+  const clean = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
   const lines = clean.split('\n');
-  if(lines.length < 2) return [];
+  if (lines.length < 2) return [];
   const headers = splitLine(lines[0]);
   const rows = [];
-  for(let i=1; i<lines.length; i++){
+  for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
-    if(!line) continue;
+    if (!line) continue;
     const vals = splitLine(lines[i]);
     const obj = {};
-    headers.forEach((h,idx)=>{ obj[h.trim()] = (vals[idx]||'').trim(); });
-    // Only skip if the entire row is blank
-    if(Object.values(obj).some(v=>v!=='')) rows.push(obj);
+    headers.forEach((h, idx) => { obj[h.trim()] = (vals[idx] || '').trim(); });
+    if (Object.values(obj).some(v => v !== '')) rows.push(obj);
   }
   return rows;
 }
 
-function splitLine(line){
-  const res=[];let cur='';let inQ=false;
-  for(let i=0;i<line.length;i++){
-    if(line[i]==='"'){inQ=!inQ;}
-    else if(line[i]===','&&!inQ){res.push(cur);cur='';}
-    else{cur+=line[i];}
+function splitLine(line) {
+  const res = []; let cur = ''; let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] === '"') { inQ = !inQ; }
+    else if (line[i] === ',' && !inQ) { res.push(cur); cur = ''; }
+    else { cur += line[i]; }
   }
   res.push(cur);
   return res;
 }
 
-// Clean numeric values — strips stray \r and spaces
-function n(v){
-  if(v===null||v===undefined)return 0;
-  const x=parseFloat(String(v).replace(/[^0-9.\-]/g,''));
-  return isNaN(x)?0:x;
+// ══════════════════════════════════════════════════════
+// FIX 3: DUPLICATE DETECTION
+// Finds rows where Institution Name + Province appear more than once.
+// Marks earlier submissions as duplicates; keeps the latest.
+// ══════════════════════════════════════════════════════
+function detectDuplicates(rows) {
+  // Build a map: key → array of row indices (in order)
+  const map = {};
+  rows.forEach((r, i) => {
+    const inst = (r['Institution Name'] || '').trim().toLowerCase();
+    const prov = (r['Ministry/ Province'] || '').trim().toLowerCase();
+    if (!inst) return;
+    const key = inst + '||' + prov;
+    if (!map[key]) map[key] = [];
+    map[key].push(i);
+  });
+
+  const dupeIndices = new Set();
+  const dupNames = [];
+  Object.entries(map).forEach(([key, indices]) => {
+    if (indices.length > 1) {
+      // All except the last (latest) are duplicates
+      indices.slice(0, -1).forEach(idx => dupeIndices.add(idx));
+      dupNames.push(rows[indices[indices.length - 1]]['Institution Name']);
+    }
+  });
+  return { dupeIndices, dupNames };
+}
+
+function toggleDedup() {
+  dedupEnabled = document.getElementById('dedupToggle').checked;
+  buildActiveRows();
+  process();
+}
+
+function buildActiveRows() {
+  if (dedupEnabled) {
+    activeRows = allRows.filter((_, i) => !dupSet.has(i));
+  } else {
+    activeRows = allRows;
+  }
 }
 
 // ══════════════════════════════════════════════════════
-// FIX 2: FETCH with 3-layer cache bypass
-// Prevents browser from ever serving stale cached data
+// FIX 4: FETCH with full cache bypass
 // ══════════════════════════════════════════════════════
-async function fetchFresh(url){
-  const bust = url + (url.includes('?')?'&':'?') + '_t=' + Date.now();
+async function fetchFresh(url) {
+  const bust = url + (url.includes('?') ? '&' : '?') + '_t=' + Date.now();
   const res = await fetch(bust, {
     method: 'GET',
     cache: 'no-store',
-    headers: {
-      'Pragma': 'no-cache',
-      'Cache-Control': 'no-cache, no-store, must-revalidate'
-    }
+    headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache, no-store, must-revalidate' }
   });
   return res;
 }
 
 // ── LOAD REAL SHEET ──
-async function loadData(){
-  let url=document.getElementById('sheetUrl').value.trim();
-  if(!url){alert('Please paste your Google Sheet CSV URL first.');return;}
-  if(url.includes('/edit'))url=url.split('/edit')[0]+'/export?format=csv&gid=0';
-  document.getElementById('loadBtnText').textContent='Loading...';
-  setStatus('loading','Fetching data...');
-  try{
+async function loadData() {
+  let url = document.getElementById('sheetUrl').value.trim();
+  if (!url) { alert('Please paste your Google Sheet CSV URL first.'); return; }
+  if (url.includes('/edit')) url = url.split('/edit')[0] + '/export?format=csv&gid=0';
+  document.getElementById('loadBtnText').textContent = 'Loading...';
+  setStatus('loading', 'Fetching data...');
+  try {
     const res = await fetchFresh(url);
-    if(!res.ok) throw new Error('HTTP '+res.status+' — check the URL and make sure the sheet is published publicly');
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' — check the URL and make sure the sheet is published publicly');
     const text = await res.text();
     const rows = parseCsv(text);
-    if(!rows.length) throw new Error('No data rows found. Make sure your sheet has data below the header row.');
+    if (!rows.length) throw new Error('No data rows found. Make sure your sheet has data below the header row.');
     const prevCount = allRows.length;
     allRows = rows;
+    const { dupeIndices, dupNames } = detectDuplicates(rows);
+    dupSet = dupeIndices;
+    updateDedupBar(dupeIndices.size, dupNames);
+    buildActiveRows();
     process();
-    setStatus('ok','LIVE — '+rows.length+' records');
-    document.getElementById('lastUpdate').textContent='Updated '+new Date().toLocaleTimeString();
-    if(prevCount>0 && rows.length!==prevCount){
-      flashCards();
-    }
+    setStatus('ok', 'LIVE — ' + rows.length + ' records (' + (rows.length - dupeIndices.size) + ' unique)');
+    document.getElementById('lastUpdate').textContent = 'Updated ' + new Date().toLocaleTimeString();
+    if (prevCount > 0 && rows.length !== prevCount) flashCards();
     startRefresh(url);
     startCountdown();
-  }catch(e){
-    setStatus('error','Error: '+e.message);
-    alert('Could not load sheet.\n\nError: '+e.message+'\n\nHow to fix:\n1. Open your Google Sheet\n2. Click File > Share > Publish to web\n3. Select your sheet tab\n4. Choose CSV format\n5. Click Publish\n6. Copy the URL and paste it above');
+  } catch (e) {
+    setStatus('error', 'Error: ' + e.message);
+    alert('Could not load sheet.\n\nError: ' + e.message + '\n\nHow to fix:\n1. Open your Google Sheet\n2. Click File > Share > Publish to web\n3. Select your sheet tab\n4. Choose CSV format\n5. Click Publish\n6. Copy the URL and paste it above');
   }
-  document.getElementById('loadBtnText').textContent='Reload Now';
+  document.getElementById('loadBtnText').textContent = 'Reload Now';
+}
+
+function updateDedupBar(dupCount, dupNames) {
+  const bar = document.getElementById('dedupBar');
+  const msg = document.getElementById('dedupMsg');
+  if (dupCount > 0) {
+    bar.classList.add('show');
+    msg.textContent = dupCount + ' duplicate submission' + (dupCount > 1 ? 's' : '') + ' detected for: ' + dupNames.slice(0, 5).join(', ') + (dupNames.length > 5 ? ' …and ' + (dupNames.length - 5) + ' more' : '') + '. Toggle to count only unique institutions.';
+  } else {
+    bar.classList.remove('show');
+  }
 }
 
 // ══════════════════════════════════════════════════════
-// FIX 3: AUTO REFRESH — never replaces good data with bad
-// If new fetch returns fewer rows than current, keep current
+// FIX 5: AUTO REFRESH — smarter safety check
+// Never replaces good data with a smaller partial response
 // ══════════════════════════════════════════════════════
-function startRefresh(url){
-  if(refreshTimer)clearInterval(refreshTimer);
-  refreshTimer=setInterval(async()=>{
-    try{
+function startRefresh(url) {
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(async () => {
+    try {
       const res = await fetchFresh(url);
-      if(!res.ok) return;
+      if (!res.ok) return;
       const text = await res.text();
       const rows = parseCsv(text);
-      // Safety check: only update if rows >= current count (prevents partial load overwriting good data)
-      if(rows.length > 0 && rows.length >= allRows.length){
+      if (rows.length > 0 && rows.length >= allRows.length) {
         const prevCount = allRows.length;
         allRows = rows;
+        const { dupeIndices, dupNames } = detectDuplicates(rows);
+        dupSet = dupeIndices;
+        updateDedupBar(dupeIndices.size, dupNames);
+        buildActiveRows();
         process();
-        setStatus('ok','LIVE — '+rows.length+' records');
-        document.getElementById('lastUpdate').textContent='Updated '+new Date().toLocaleTimeString();
-        if(rows.length !== prevCount){
-          flashCards();
-        }
-      } else if(rows.length > 0 && rows.length < allRows.length){
-        // Got fewer rows — might be a partial Google response, just update status
-        setStatus('ok','LIVE — '+allRows.length+' records (refresh ok)');
-        document.getElementById('lastUpdate').textContent='Checked '+new Date().toLocaleTimeString();
+        setStatus('ok', 'LIVE — ' + rows.length + ' records (' + (rows.length - dupeIndices.size) + ' unique)');
+        document.getElementById('lastUpdate').textContent = 'Updated ' + new Date().toLocaleTimeString();
+        if (rows.length !== prevCount) flashCards();
+      } else if (rows.length > 0) {
+        // Partial Google response — don't overwrite, just note it
+        setStatus('ok', 'LIVE — ' + allRows.length + ' records (refresh ok)');
+        document.getElementById('lastUpdate').textContent = 'Checked ' + new Date().toLocaleTimeString();
       }
-    }catch(e){
-      setStatus('error','Refresh failed — retrying...');
+    } catch (e) {
+      setStatus('error', 'Refresh failed — retrying...');
     }
-  },REFRESH_MS);
+  }, REFRESH_MS);
 }
 
-function flashCards(){
-  document.querySelectorAll('.metric-card').forEach(c=>{
-    c.classList.remove('flash');
-    void c.offsetWidth;
-    c.classList.add('flash');
+function flashCards() {
+  document.querySelectorAll('.metric-card').forEach(c => {
+    c.classList.remove('flash'); void c.offsetWidth; c.classList.add('flash');
   });
 }
 
 // ── DEMO DATA ──
-function loadDemo(){
-  allRows=[
+function loadDemo() {
+  allRows = [
     {Timestamp:'2024-01-10','Ministry/ Province':'Western','RDHS':'Colombo','Institution Name':'National Hospital Colombo','Focal Point Name':'Dr. A. Silva','Total number of operational Ambulances':'8','Number of Ambulances using Diesel - Normal':'4','Weekly Consumption of Ambulances using Diesel - Normal':'320','Number of Ambulances using Diesel - Super':'1','Weekly Consumption of Ambulances using Diesel - Super':'60','Number of Ambulances using Petrol 92':'2','Weekly Consumption of Ambulances using Petrol 92':'100','Number of Ambulances using Petrol 95':'1','Weekly Consumption of Ambulances using Petrol 95':'55','Number of other vehicles using Diesel - Normal':'6','Weekly Consumption of other vehicles using Diesel - Normal':'240','Number of other vehicles using Diesel - Super':'0','Weekly Consumption of other vehicles using Diesel - Super':'0','Number of other vehicles using Petrol 92':'1','Weekly Consumption of other vehicles using Petrol 92':'40','Number of other vehicles using Petrol 95':'0','Weekly Consumption of other vehicles using Petrol 95':'0','What are the types of other vehicles that you are mentioning above?':'Office vehicles','Number of Generators using Diesel - Normal':'3','Capacity of Generators using Diesel - Normal':'15kVA','Number of Generators using Petrol 92':'1','Capacity of Generators using Petrol 92':'5kVA','Generators - Any other remarks':'Main backup'},
     {Timestamp:'2024-01-10','Ministry/ Province':'Western','RDHS':'Colombo','Institution Name':'Kalubowila Teaching Hospital','Focal Point Name':'Dr. B. Perera','Total number of operational Ambulances':'5','Number of Ambulances using Diesel - Normal':'3','Weekly Consumption of Ambulances using Diesel - Normal':'210','Number of Ambulances using Diesel - Super':'0','Weekly Consumption of Ambulances using Diesel - Super':'0','Number of Ambulances using Petrol 92':'1','Weekly Consumption of Ambulances using Petrol 92':'70','Number of Ambulances using Petrol 95':'1','Weekly Consumption of Ambulances using Petrol 95':'65','Number of other vehicles using Diesel - Normal':'4','Weekly Consumption of other vehicles using Diesel - Normal':'180','Number of other vehicles using Diesel - Super':'0','Weekly Consumption of other vehicles using Diesel - Super':'0','Number of other vehicles using Petrol 92':'0','Weekly Consumption of other vehicles using Petrol 92':'0','Number of other vehicles using Petrol 95':'0','Weekly Consumption of other vehicles using Petrol 95':'0','What are the types of other vehicles that you are mentioning above?':'Office vehicles','Number of Generators using Diesel - Normal':'2','Capacity of Generators using Diesel - Normal':'10kVA','Number of Generators using Petrol 92':'0','Capacity of Generators using Petrol 92':'','Generators - Any other remarks':''},
     {Timestamp:'2024-01-11','Ministry/ Province':'Central','RDHS':'Kandy','Institution Name':'Kandy Teaching Hospital','Focal Point Name':'Dr. C. Fernando','Total number of operational Ambulances':'6','Number of Ambulances using Diesel - Normal':'4','Weekly Consumption of Ambulances using Diesel - Normal':'280','Number of Ambulances using Diesel - Super':'0','Weekly Consumption of Ambulances using Diesel - Super':'0','Number of Ambulances using Petrol 92':'2','Weekly Consumption of Ambulances using Petrol 92':'120','Number of Ambulances using Petrol 95':'0','Weekly Consumption of Ambulances using Petrol 95':'0','Number of other vehicles using Diesel - Normal':'5','Weekly Consumption of other vehicles using Diesel - Normal':'200','Number of other vehicles using Diesel - Super':'0','Weekly Consumption of other vehicles using Diesel - Super':'0','Number of other vehicles using Petrol 92':'2','Weekly Consumption of other vehicles using Petrol 92':'80','Number of other vehicles using Petrol 95':'0','Weekly Consumption of other vehicles using Petrol 95':'0','What are the types of other vehicles that you are mentioning above?':'Office vehicles, buses','Number of Generators using Diesel - Normal':'4','Capacity of Generators using Diesel - Normal':'20kVA','Number of Generators using Petrol 92':'0','Capacity of Generators using Petrol 92':'','Generators - Any other remarks':''},
@@ -340,198 +419,242 @@ function loadDemo(){
     {Timestamp:'2024-01-12','Ministry/ Province':'Eastern','RDHS':'Batticaloa','Institution Name':'Batticaloa Teaching Hospital','Focal Point Name':'Dr. F. Thilak','Total number of operational Ambulances':'3','Number of Ambulances using Diesel - Normal':'2','Weekly Consumption of Ambulances using Diesel - Normal':'140','Number of Ambulances using Diesel - Super':'0','Weekly Consumption of Ambulances using Diesel - Super':'0','Number of Ambulances using Petrol 92':'1','Weekly Consumption of Ambulances using Petrol 92':'60','Number of Ambulances using Petrol 95':'0','Weekly Consumption of Ambulances using Petrol 95':'0','Number of other vehicles using Diesel - Normal':'2','Weekly Consumption of other vehicles using Diesel - Normal':'80','Number of other vehicles using Diesel - Super':'0','Weekly Consumption of other vehicles using Diesel - Super':'0','Number of other vehicles using Petrol 92':'0','Weekly Consumption of other vehicles using Petrol 92':'0','Number of other vehicles using Petrol 95':'0','Weekly Consumption of other vehicles using Petrol 95':'0','What are the types of other vehicles that you are mentioning above?':'Office vehicles','Number of Generators using Diesel - Normal':'1','Capacity of Generators using Diesel - Normal':'6kVA','Number of Generators using Petrol 92':'0','Capacity of Generators using Petrol 92':'','Generators - Any other remarks':''},
     {Timestamp:'2024-01-13','Ministry/ Province':'Western','RDHS':'Gampaha','Institution Name':'Negombo Hospital','Focal Point Name':'Dr. G. Ranasinghe','Total number of operational Ambulances':'5','Number of Ambulances using Diesel - Normal':'3','Weekly Consumption of Ambulances using Diesel - Normal':'200','Number of Ambulances using Diesel - Super':'1','Weekly Consumption of Ambulances using Diesel - Super':'65','Number of Ambulances using Petrol 92':'1','Weekly Consumption of Ambulances using Petrol 92':'50','Number of Ambulances using Petrol 95':'0','Weekly Consumption of Ambulances using Petrol 95':'0','Number of other vehicles using Diesel - Normal':'3','Weekly Consumption of other vehicles using Diesel - Normal':'110','Number of other vehicles using Diesel - Super':'0','Weekly Consumption of other vehicles using Diesel - Super':'0','Number of other vehicles using Petrol 92':'1','Weekly Consumption of other vehicles using Petrol 92':'30','Number of other vehicles using Petrol 95':'0','Weekly Consumption of other vehicles using Petrol 95':'0','What are the types of other vehicles that you are mentioning above?':'Office vehicles','Number of Generators using Diesel - Normal':'2','Capacity of Generators using Diesel - Normal':'10kVA','Number of Generators using Petrol 92':'0','Capacity of Generators using Petrol 92':'','Generators - Any other remarks':''},
     {Timestamp:'2024-01-13','Ministry/ Province':'North Western','RDHS':'Kurunegala','Institution Name':'Kurunegala Teaching Hospital','Focal Point Name':'Dr. H. Wijesinghe','Total number of operational Ambulances':'6','Number of Ambulances using Diesel - Normal':'4','Weekly Consumption of Ambulances using Diesel - Normal':'260','Number of Ambulances using Diesel - Super':'0','Weekly Consumption of Ambulances using Diesel - Super':'0','Number of Ambulances using Petrol 92':'2','Weekly Consumption of Ambulances using Petrol 92':'110','Number of Ambulances using Petrol 95':'0','Weekly Consumption of Ambulances using Petrol 95':'0','Number of other vehicles using Diesel - Normal':'4','Weekly Consumption of other vehicles using Diesel - Normal':'160','Number of other vehicles using Diesel - Super':'0','Weekly Consumption of other vehicles using Diesel - Super':'0','Number of other vehicles using Petrol 92':'1','Weekly Consumption of other vehicles using Petrol 92':'45','Number of other vehicles using Petrol 95':'0','Weekly Consumption of other vehicles using Petrol 95':'0','What are the types of other vehicles that you are mentioning above?':'Office vehicles, buses','Number of Generators using Diesel - Normal':'3','Capacity of Generators using Diesel - Normal':'15kVA','Number of Generators using Petrol 92':'0','Capacity of Generators using Petrol 92':'','Generators - Any other remarks':''},
+    // Intentional duplicate for demo
+    {Timestamp:'2024-01-14','Ministry/ Province':'Western','RDHS':'Colombo','Institution Name':'National Hospital Colombo','Focal Point Name':'Dr. A. Silva (updated)','Total number of operational Ambulances':'9','Number of Ambulances using Diesel - Normal':'5','Weekly Consumption of Ambulances using Diesel - Normal':'350','Number of Ambulances using Diesel - Super':'1','Weekly Consumption of Ambulances using Diesel - Super':'65','Number of Ambulances using Petrol 92':'2','Weekly Consumption of Ambulances using Petrol 92':'105','Number of Ambulances using Petrol 95':'1','Weekly Consumption of Ambulances using Petrol 95':'55','Number of other vehicles using Diesel - Normal':'6','Weekly Consumption of other vehicles using Diesel - Normal':'240','Number of other vehicles using Diesel - Super':'0','Weekly Consumption of other vehicles using Diesel - Super':'0','Number of other vehicles using Petrol 92':'1','Weekly Consumption of other vehicles using Petrol 92':'40','Number of other vehicles using Petrol 95':'0','Weekly Consumption of other vehicles using Petrol 95':'0','What are the types of other vehicles that you are mentioning above?':'Office vehicles','Number of Generators using Diesel - Normal':'3','Capacity of Generators using Diesel - Normal':'15kVA','Number of Generators using Petrol 92':'1','Capacity of Generators using Petrol 92':'5kVA','Generators - Any other remarks':'Updated entry'},
     {Timestamp:'2024-01-14','Ministry/ Province':'Sabaragamuwa','RDHS':'Ratnapura','Institution Name':'Ratnapura General Hospital','Focal Point Name':'Dr. I. Dissanayake','Total number of operational Ambulances':'4','Number of Ambulances using Diesel - Normal':'3','Weekly Consumption of Ambulances using Diesel - Normal':'190','Number of Ambulances using Diesel - Super':'0','Weekly Consumption of Ambulances using Diesel - Super':'0','Number of Ambulances using Petrol 92':'1','Weekly Consumption of Ambulances using Petrol 92':'65','Number of Ambulances using Petrol 95':'0','Weekly Consumption of Ambulances using Petrol 95':'0','Number of other vehicles using Diesel - Normal':'2','Weekly Consumption of other vehicles using Diesel - Normal':'75','Number of other vehicles using Diesel - Super':'0','Weekly Consumption of other vehicles using Diesel - Super':'0','Number of other vehicles using Petrol 92':'0','Weekly Consumption of other vehicles using Petrol 92':'0','Number of other vehicles using Petrol 95':'0','Weekly Consumption of other vehicles using Petrol 95':'0','What are the types of other vehicles that you are mentioning above?':'Office vehicles','Number of Generators using Diesel - Normal':'2','Capacity of Generators using Diesel - Normal':'8kVA','Number of Generators using Petrol 92':'0','Capacity of Generators using Petrol 92':'','Generators - Any other remarks':''},
     {Timestamp:'2024-01-14','Ministry/ Province':'Uva','RDHS':'Badulla','Institution Name':'Badulla General Hospital','Focal Point Name':'Dr. J. Bandara','Total number of operational Ambulances':'3','Number of Ambulances using Diesel - Normal':'2','Weekly Consumption of Ambulances using Diesel - Normal':'150','Number of Ambulances using Diesel - Super':'1','Weekly Consumption of Ambulances using Diesel - Super':'55','Number of Ambulances using Petrol 92':'0','Weekly Consumption of Ambulances using Petrol 92':'0','Number of Ambulances using Petrol 95':'0','Weekly Consumption of Ambulances using Petrol 95':'0','Number of other vehicles using Diesel - Normal':'1','Weekly Consumption of other vehicles using Diesel - Normal':'50','Number of other vehicles using Diesel - Super':'0','Weekly Consumption of other vehicles using Diesel - Super':'0','Number of other vehicles using Petrol 92':'0','Weekly Consumption of other vehicles using Petrol 92':'0','Number of other vehicles using Petrol 95':'0','Weekly Consumption of other vehicles using Petrol 95':'0','What are the types of other vehicles that you are mentioning above?':'Office vehicles','Number of Generators using Diesel - Normal':'1','Capacity of Generators using Diesel - Normal':'5kVA','Number of Generators using Petrol 92':'0','Capacity of Generators using Petrol 92':'','Generators - Any other remarks':''}
   ];
+  const { dupeIndices, dupNames } = detectDuplicates(allRows);
+  dupSet = dupeIndices;
+  updateDedupBar(dupeIndices.size, dupNames);
+  buildActiveRows();
   process();
-  setStatus('ok','Demo data loaded — your live Sheet URL is already connected above');
+  setStatus('ok', 'Demo data — ' + allRows.length + ' records (' + (allRows.length - dupeIndices.size) + ' unique)');
 }
 
-function process(){updateMetrics();updateCharts();populateFilters();applyFilters();}
+function process() { updateMetrics(); updateCharts(); populateFilters(); applyFilters(); }
 
-function updateMetrics(){
-  const r=allRows;
-  document.getElementById('m-inst').textContent=r.length;
-  document.getElementById('m-amb').textContent=r.reduce((s,x)=>s+n(x['Total number of operational Ambulances']),0);
-  const diesel=r.reduce((s,x)=>s+n(x['Weekly Consumption of Ambulances using Diesel - Normal'])+n(x['Weekly Consumption of Ambulances using Diesel - Super']),0);
-  const petrol=r.reduce((s,x)=>s+n(x['Weekly Consumption of Ambulances using Petrol 92'])+n(x['Weekly Consumption of Ambulances using Petrol 95']),0);
-  document.getElementById('m-diesel').textContent=diesel.toLocaleString();
-  document.getElementById('m-petrol').textContent=petrol.toLocaleString();
-  const ov=r.reduce((s,x)=>s+n(x['Number of other vehicles using Diesel - Normal'])+n(x['Number of other vehicles using Diesel - Super'])+n(x['Number of other vehicles using Petrol 92'])+n(x['Number of other vehicles using Petrol 95']),0);
-  document.getElementById('m-other').textContent=ov;
-  const gen=r.reduce((s,x)=>s+n(x['Number of Generators using Diesel - Normal'])+n(x['Number of Generators using Petrol 92']),0);
-  document.getElementById('m-gen').textContent=gen;
+function updateMetrics() {
+  const r = activeRows;
+  const total = allRows.length;
+  const unique = allRows.length - dupSet.size;
+  document.getElementById('m-inst').textContent = dedupEnabled ? unique : total;
+  document.getElementById('m-inst-sub').textContent = dedupEnabled
+    ? 'unique institutions'
+    : total !== unique ? total + ' submissions (' + unique + ' unique)' : 'reporting';
+  document.getElementById('m-amb').textContent = r.reduce((s, x) => s + n(x['Total number of operational Ambulances']), 0);
+  const diesel = r.reduce((s, x) => s + n(x['Weekly Consumption of Ambulances using Diesel - Normal']) + n(x['Weekly Consumption of Ambulances using Diesel - Super']), 0);
+  const petrol = r.reduce((s, x) => s + n(x['Weekly Consumption of Ambulances using Petrol 92']) + n(x['Weekly Consumption of Ambulances using Petrol 95']), 0);
+  document.getElementById('m-diesel').textContent = diesel.toLocaleString(undefined, {maximumFractionDigits: 1});
+  document.getElementById('m-petrol').textContent = petrol.toLocaleString(undefined, {maximumFractionDigits: 1});
+  const ov = r.reduce((s, x) => s + n(x['Number of other vehicles using Diesel - Normal']) + n(x['Number of other vehicles using Diesel - Super']) + n(x['Number of other vehicles using Petrol 92']) + n(x['Number of other vehicles using Petrol 95']), 0);
+  document.getElementById('m-other').textContent = ov;
+  const gen = r.reduce((s, x) => s + n(x['Number of Generators using Diesel - Normal']) + n(x['Number of Generators using Petrol 92']), 0);
+  document.getElementById('m-gen').textContent = gen;
 }
 
-function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
 
-function updateCharts(){
-  const r=allRows;
-  const d1=r.reduce((s,x)=>s+n(x['Number of Ambulances using Diesel - Normal']),0);
-  const d2=r.reduce((s,x)=>s+n(x['Number of Ambulances using Diesel - Super']),0);
-  const p92=r.reduce((s,x)=>s+n(x['Number of Ambulances using Petrol 92']),0);
-  const p95=r.reduce((s,x)=>s+n(x['Number of Ambulances using Petrol 95']),0);
-  const tot=d1+d2+p92+p95||1;
-  const fC=['#e74c3c','#e67e22','#27ae60','#2980b9'];
-  const fL=['Diesel Normal','Diesel Super','Petrol 92','Petrol 95'];
-  const fD=[d1,d2,p92,p95];
-  document.getElementById('fuelLegend').innerHTML=fL.map((l,i)=>fD[i]?`<span class="legend-item"><span class="legend-dot" style="background:${fC[i]}"></span>${l} (${Math.round(fD[i]/tot*100)}%)</span>`:'').join('');
+function updateCharts() {
+  const r = activeRows;
+
+  // ── Fuel type donut ──
+  const d1 = r.reduce((s, x) => s + n(x['Number of Ambulances using Diesel - Normal']), 0);
+  const d2 = r.reduce((s, x) => s + n(x['Number of Ambulances using Diesel - Super']), 0);
+  const p92 = r.reduce((s, x) => s + n(x['Number of Ambulances using Petrol 92']), 0);
+  const p95 = r.reduce((s, x) => s + n(x['Number of Ambulances using Petrol 95']), 0);
+  const tot = d1 + d2 + p92 + p95 || 1;
+  const fC = ['#e74c3c', '#e67e22', '#27ae60', '#2980b9'];
+  const fL = ['Diesel Normal', 'Diesel Super', 'Petrol 92', 'Petrol 95'];
+  const fD = [d1, d2, p92, p95];
+  document.getElementById('fuelLegend').innerHTML = fL.map((l, i) => fD[i] ? `<span class="legend-item"><span class="legend-dot" style="background:${fC[i]}"></span>${l} (${Math.round(fD[i] / tot * 100)}%)</span>` : '').join('');
   destroyChart('chartFuel');
-  charts['chartFuel']=new Chart(document.getElementById('chartFuel'),{type:'doughnut',data:{labels:fL,datasets:[{data:fD,backgroundColor:fC,borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},cutout:'60%'}});
+  charts['chartFuel'] = new Chart(document.getElementById('chartFuel'), { type: 'doughnut', data: { labels: fL, datasets: [{ data: fD, backgroundColor: fC, borderWidth: 2, borderColor: '#fff' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '60%' } });
 
-  const sorted=[...r].sort((a,b)=>n(b['Total number of operational Ambulances'])-n(a['Total number of operational Ambulances'])).slice(0,8);
+  // ── Top 8 by fleet size ──
+  const sorted = [...r].sort((a, b) => n(b['Total number of operational Ambulances']) - n(a['Total number of operational Ambulances'])).slice(0, 8);
   destroyChart('chartFleet');
-  charts['chartFleet']=new Chart(document.getElementById('chartFleet'),{type:'bar',data:{labels:sorted.map(x=>sh(x['Institution Name']||x['RDHS']||'?',15)),datasets:[{data:sorted.map(x=>n(x['Total number of operational Ambulances'])),backgroundColor:'#c0392b',borderRadius:4,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10}},grid:{display:false}},y:{ticks:{font:{size:10}},grid:{color:'#f5f5f5'}}}}});
+  charts['chartFleet'] = new Chart(document.getElementById('chartFleet'), { type: 'bar', data: { labels: sorted.map(x => sh(x['Institution Name'] || x['RDHS'] || '?', 15)), datasets: [{ data: sorted.map(x => n(x['Total number of operational Ambulances'])), backgroundColor: '#c0392b', borderRadius: 4, borderSkipped: false }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 } }, grid: { display: false } }, y: { ticks: { font: { size: 10 } }, grid: { color: '#f5f5f5' } } } } });
 
-  const pm={};
-  r.forEach(x=>{const p=x['Ministry/ Province']||x['RDHS']||'Unknown';const w=n(x['Weekly Consumption of Ambulances using Diesel - Normal'])+n(x['Weekly Consumption of Ambulances using Diesel - Super'])+n(x['Weekly Consumption of Ambulances using Petrol 92'])+n(x['Weekly Consumption of Ambulances using Petrol 95']);pm[p]=(pm[p]||0)+w;});
-  const pK=Object.keys(pm).slice(0,10);
+  // ── FIX: Province chart — sort by value, show top 12 ──
+  const pm = {};
+  r.forEach(x => {
+    const p = x['Ministry/ Province'] || x['RDHS'] || 'Unknown';
+    const w = n(x['Weekly Consumption of Ambulances using Diesel - Normal']) + n(x['Weekly Consumption of Ambulances using Diesel - Super']) + n(x['Weekly Consumption of Ambulances using Petrol 92']) + n(x['Weekly Consumption of Ambulances using Petrol 95']);
+    pm[p] = (pm[p] || 0) + w;
+  });
+  // Sort by value descending, take top 12
+  const pK = Object.entries(pm).sort((a, b) => b[1] - a[1]).slice(0, 12).map(e => e[0]);
   destroyChart('chartProvince');
-  charts['chartProvince']=new Chart(document.getElementById('chartProvince'),{type:'bar',data:{labels:pK,datasets:[{data:pK.map(k=>pm[k]),backgroundColor:'#8e44ad',borderRadius:4,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10}},grid:{color:'#f5f5f5'}},y:{ticks:{font:{size:10}},grid:{display:false}}}}});
+  charts['chartProvince'] = new Chart(document.getElementById('chartProvince'), { type: 'bar', data: { labels: pK, datasets: [{ data: pK.map(k => pm[k]), backgroundColor: '#8e44ad', borderRadius: 4, borderSkipped: false }] }, options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 } }, grid: { color: '#f5f5f5' } }, y: { ticks: { font: { size: 10 } }, grid: { display: false } } } } });
 
-  const aT=r.reduce((s,x)=>s+n(x['Total number of operational Ambulances']),0);
-  const oT=r.reduce((s,x)=>s+n(x['Number of other vehicles using Diesel - Normal'])+n(x['Number of other vehicles using Diesel - Super'])+n(x['Number of other vehicles using Petrol 92'])+n(x['Number of other vehicles using Petrol 95']),0);
-  const gT=r.reduce((s,x)=>s+n(x['Number of Generators using Diesel - Normal'])+n(x['Number of Generators using Petrol 92']),0);
-  const vC=['#c0392b','#2980b9','#27ae60'];const vL=['Ambulances','Other Vehicles','Generators'];const vD=[aT,oT,gT];const vT=aT+oT+gT||1;
-  document.getElementById('vehicleLegend').innerHTML=vL.map((l,i)=>`<span class="legend-item"><span class="legend-dot" style="background:${vC[i]}"></span>${l} (${Math.round(vD[i]/vT*100)}%)</span>`).join('');
+  // ── Ambulances vs Other vs Generators donut ──
+  const aT = r.reduce((s, x) => s + n(x['Total number of operational Ambulances']), 0);
+  const oT = r.reduce((s, x) => s + n(x['Number of other vehicles using Diesel - Normal']) + n(x['Number of other vehicles using Diesel - Super']) + n(x['Number of other vehicles using Petrol 92']) + n(x['Number of other vehicles using Petrol 95']), 0);
+  const gT = r.reduce((s, x) => s + n(x['Number of Generators using Diesel - Normal']) + n(x['Number of Generators using Petrol 92']), 0);
+  const vC = ['#c0392b', '#2980b9', '#27ae60']; const vL = ['Ambulances', 'Other Vehicles', 'Generators']; const vD = [aT, oT, gT]; const vT = aT + oT + gT || 1;
+  document.getElementById('vehicleLegend').innerHTML = vL.map((l, i) => `<span class="legend-item"><span class="legend-dot" style="background:${vC[i]}"></span>${l} (${Math.round(vD[i] / vT * 100)}%)</span>`).join('');
   destroyChart('chartVehicle');
-  charts['chartVehicle']=new Chart(document.getElementById('chartVehicle'),{type:'doughnut',data:{labels:vL,datasets:[{data:vD,backgroundColor:vC,borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},cutout:'55%'}});
+  charts['chartVehicle'] = new Chart(document.getElementById('chartVehicle'), { type: 'doughnut', data: { labels: vL, datasets: [{ data: vD, backgroundColor: vC, borderWidth: 2, borderColor: '#fff' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '55%' } });
 
-  const dTot=r.reduce((s,x)=>s+n(x['Weekly Consumption of Ambulances using Diesel - Normal'])+n(x['Weekly Consumption of Ambulances using Diesel - Super']),0);
-  const pTot=r.reduce((s,x)=>s+n(x['Weekly Consumption of Ambulances using Petrol 92'])+n(x['Weekly Consumption of Ambulances using Petrol 95']),0);
-  const odT=r.reduce((s,x)=>s+n(x['Weekly Consumption of other vehicles using Diesel - Normal']),0);
-  const opT=r.reduce((s,x)=>s+n(x['Weekly Consumption of other vehicles using Petrol 92']),0);
+  // ── Diesel vs Petrol bar ──
+  const dTot = r.reduce((s, x) => s + n(x['Weekly Consumption of Ambulances using Diesel - Normal']) + n(x['Weekly Consumption of Ambulances using Diesel - Super']), 0);
+  const pTot = r.reduce((s, x) => s + n(x['Weekly Consumption of Ambulances using Petrol 92']) + n(x['Weekly Consumption of Ambulances using Petrol 95']), 0);
+  const odT = r.reduce((s, x) => s + n(x['Weekly Consumption of other vehicles using Diesel - Normal']) + n(x['Weekly Consumption of other vehicles using Diesel - Super']), 0);
+  const opT = r.reduce((s, x) => s + n(x['Weekly Consumption of other vehicles using Petrol 92']) + n(x['Weekly Consumption of other vehicles using Petrol 95']), 0);
   destroyChart('chartDvP');
-  charts['chartDvP']=new Chart(document.getElementById('chartDvP'),{type:'bar',data:{labels:['Ambulances','Other Vehicles'],datasets:[{label:'Diesel',data:[dTot,odT],backgroundColor:'#e67e22',borderRadius:4},{label:'Petrol',data:[pTot,opT],backgroundColor:'#27ae60',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:11},boxWidth:10}}},scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'#f5f5f5'},ticks:{font:{size:10}}}}}});
+  charts['chartDvP'] = new Chart(document.getElementById('chartDvP'), { type: 'bar', data: { labels: ['Ambulances', 'Other Vehicles'], datasets: [{ label: 'Diesel', data: [dTot, odT], backgroundColor: '#e67e22', borderRadius: 4 }, { label: 'Petrol', data: [pTot, opT], backgroundColor: '#27ae60', borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 10 } } }, scales: { x: { grid: { display: false }, ticks: { font: { size: 11 } } }, y: { grid: { color: '#f5f5f5' }, ticks: { font: { size: 10 } } } } } });
 
-  const dm={};
-  r.forEach(x=>{if(!x.Timestamp)return;const d=(x.Timestamp.split('T')[0]||x.Timestamp.split(' ')[0]||'').slice(0,10);if(d)dm[d]=(dm[d]||0)+1;});
-  const dates=Object.keys(dm).sort();
+  // ── Submissions over time (always uses allRows so duplicates show in timeline) ──
+  const dm = {};
+  allRows.forEach(x => {
+    if (!x.Timestamp) return;
+    const raw = x.Timestamp || '';
+    // Handle "3/16/2026 8:42:35" and "2024-01-10" formats
+    let d = '';
+    if (raw.includes('/')) {
+      const parts = raw.split(' ')[0].split('/');
+      if (parts.length === 3) {
+        // M/D/YYYY → YYYY-MM-DD
+        d = parts[2] + '-' + parts[0].padStart(2, '0') + '-' + parts[1].padStart(2, '0');
+      }
+    } else {
+      d = raw.split('T')[0].slice(0, 10);
+    }
+    if (d) dm[d] = (dm[d] || 0) + 1;
+  });
+  const dates = Object.keys(dm).sort();
   destroyChart('chartTime');
-  charts['chartTime']=new Chart(document.getElementById('chartTime'),{type:'line',data:{labels:dates,datasets:[{label:'Submissions',data:dates.map(d=>dm[d]),borderColor:'#c0392b',backgroundColor:'rgba(192,57,43,0.08)',tension:0.3,fill:true,pointRadius:4,pointBackgroundColor:'#c0392b'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10}},grid:{display:false}},y:{ticks:{font:{size:10},stepSize:1},grid:{color:'#f5f5f5'}}}}});
+  charts['chartTime'] = new Chart(document.getElementById('chartTime'), { type: 'line', data: { labels: dates, datasets: [{ label: 'Submissions', data: dates.map(d => dm[d]), borderColor: '#c0392b', backgroundColor: 'rgba(192,57,43,0.08)', tension: 0.3, fill: true, pointRadius: 4, pointBackgroundColor: '#c0392b' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 } }, grid: { display: false } }, y: { ticks: { font: { size: 10 }, stepSize: 1 }, grid: { color: '#f5f5f5' } } } } });
 }
 
-function populateFilters(){
-  const prov=[...new Set(allRows.map(r=>r['Ministry/ Province']).filter(Boolean))].sort();
-  const rdhs=[...new Set(allRows.map(r=>r['RDHS']).filter(Boolean))].sort();
-  document.getElementById('filterProvince').innerHTML='<option value="">All Provinces</option>'+prov.map(p=>`<option>${p}</option>`).join('');
-  document.getElementById('filterRDHS').innerHTML='<option value="">All RDHS</option>'+rdhs.map(r=>`<option>${r}</option>`).join('');
+function populateFilters() {
+  const prov = [...new Set(allRows.map(r => r['Ministry/ Province']).filter(Boolean))].sort();
+  const rdhs = [...new Set(allRows.map(r => r['RDHS']).filter(Boolean))].sort();
+  document.getElementById('filterProvince').innerHTML = '<option value="">All Provinces</option>' + prov.map(p => `<option>${p}</option>`).join('');
+  document.getElementById('filterRDHS').innerHTML = '<option value="">All RDHS</option>' + rdhs.map(r => `<option>${r}</option>`).join('');
 }
 
-function applyFilters(){
-  const q=document.getElementById('searchBox').value.toLowerCase();
-  const prov=document.getElementById('filterProvince').value;
-  const rdhs=document.getElementById('filterRDHS').value;
-  filtered=allRows.filter(r=>{
-    if(q&&!Object.values(r).join(' ').toLowerCase().includes(q))return false;
-    if(prov&&r['Ministry/ Province']!==prov)return false;
-    if(rdhs&&r['RDHS']!==rdhs)return false;
+function applyFilters() {
+  const q = document.getElementById('searchBox').value.toLowerCase();
+  const prov = document.getElementById('filterProvince').value;
+  const rdhs = document.getElementById('filterRDHS').value;
+  // Filter from allRows so user can see duplicates in table; mark them visually
+  filtered = allRows.map((r, i) => ({ ...r, __idx: i })).filter(r => {
+    if (q && !Object.values(r).join(' ').toLowerCase().includes(q)) return false;
+    if (prov && r['Ministry/ Province'] !== prov) return false;
+    if (rdhs && r['RDHS'] !== rdhs) return false;
+    if (dedupEnabled && dupSet.has(r.__idx)) return false;
     return true;
   });
-  page=1;renderTable();
+  page = 1; renderTable();
 }
 
-function switchTab(tab){
-  currentTab=tab;
-  ['inst','amb','other','gen'].forEach(t=>document.getElementById('tab-'+t).classList.toggle('active',t===tab));
-  page=1;renderTable();
+function switchTab(tab) {
+  currentTab = tab;
+  ['inst', 'amb', 'other', 'gen'].forEach(t => document.getElementById('tab-' + t).classList.toggle('active', t === tab));
+  page = 1; renderTable();
 }
 
-function doSort(col){if(sortCol===col)sortDir*=-1;else{sortCol=col;sortDir=1;}renderTable();}
+function doSort(col) { if (sortCol === col) sortDir *= -1; else { sortCol = col; sortDir = 1; } renderTable(); }
 
-function renderTable(){
-  const wrap=document.getElementById('tableWrap');
-  if(!filtered.length){
-    wrap.innerHTML='<div class="empty-state"><div class="empty-icon">&#128203;</div><div class="empty-text">No data loaded yet</div><div class="empty-sub">Your Google Sheet URL is connected — data loads automatically on open</div></div>';
-    document.getElementById('paginationBar').innerHTML='';return;
+function renderTable() {
+  const wrap = document.getElementById('tableWrap');
+  if (!filtered.length) {
+    wrap.innerHTML = '<div class="empty-state"><div class="empty-icon">&#128203;</div><div class="empty-text">No data loaded yet</div><div class="empty-sub">Your Google Sheet URL is connected — data loads automatically on open</div></div>';
+    document.getElementById('paginationBar').innerHTML = ''; return;
   }
-  let data=[...filtered];
-  if(sortCol!==null){
-    data.sort((a,b)=>{
-      const av=a[sortCol]||'',bv=b[sortCol]||'';
-      const an=parseFloat(av),bn=parseFloat(bv);
-      if(!isNaN(an)&&!isNaN(bn))return sortDir*(an-bn);
-      return sortDir*av.localeCompare(bv);
+  let data = [...filtered];
+  if (sortCol !== null) {
+    data.sort((a, b) => {
+      const av = a[sortCol] || '', bv = b[sortCol] || '';
+      const an = parseFloat(av), bn = parseFloat(bv);
+      if (!isNaN(an) && !isNaN(bn)) return sortDir * (an - bn);
+      return sortDir * av.localeCompare(bv);
     });
   }
-  const start=(page-1)*PAGE_SIZE,end=start+PAGE_SIZE;
-  const pd=data.slice(start,end);
-  let html='';
+  const start = (page - 1) * PAGE_SIZE, end = start + PAGE_SIZE;
+  const pd = data.slice(start, end);
+  let html = '';
 
-  if(currentTab==='inst'){
-    html='<table><thead><tr><th onclick="doSort(\'Institution Name\')">Institution</th><th onclick="doSort(\'Ministry/ Province\')">Province</th><th onclick="doSort(\'RDHS\')">RDHS</th><th onclick="doSort(\'Total number of operational Ambulances\')">Ambulances</th><th>Diesel/wk (L)</th><th>Petrol/wk (L)</th><th>Other Vehicles</th><th>Generators</th><th onclick="doSort(\'Focal Point Name\')">Focal Point</th></tr></thead><tbody>';
-    pd.forEach(r=>{
-      const diesel=n(r['Weekly Consumption of Ambulances using Diesel - Normal'])+n(r['Weekly Consumption of Ambulances using Diesel - Super']);
-      const petrol=n(r['Weekly Consumption of Ambulances using Petrol 92'])+n(r['Weekly Consumption of Ambulances using Petrol 95']);
-      const ov=n(r['Number of other vehicles using Diesel - Normal'])+n(r['Number of other vehicles using Diesel - Super'])+n(r['Number of other vehicles using Petrol 92'])+n(r['Number of other vehicles using Petrol 95']);
-      const gen=n(r['Number of Generators using Diesel - Normal'])+n(r['Number of Generators using Petrol 92']);
-      html+=`<tr><td style="font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r['Institution Name']||''}">${r['Institution Name']||'—'}</td><td>${r['Ministry/ Province']||'—'}</td><td>${r['RDHS']||'—'}</td><td><strong style="color:#c0392b">${n(r['Total number of operational Ambulances'])}</strong></td><td>${diesel||'—'}</td><td>${petrol||'—'}</td><td>${ov||'—'}</td><td>${gen||'—'}</td><td style="font-size:12px;color:#888">${r['Focal Point Name']||'—'}</td></tr>`;
+  if (currentTab === 'inst') {
+    html = '<table><thead><tr><th onclick="doSort(\'Institution Name\')">Institution</th><th onclick="doSort(\'Ministry/ Province\')">Province</th><th onclick="doSort(\'RDHS\')">RDHS</th><th onclick="doSort(\'Total number of operational Ambulances\')">Ambulances</th><th>Diesel/wk (L)</th><th>Petrol/wk (L)</th><th>Other Vehicles</th><th>Generators</th><th onclick="doSort(\'Focal Point Name\')">Focal Point</th></tr></thead><tbody>';
+    pd.forEach(r => {
+      const isDup = dupSet.has(r.__idx);
+      const diesel = n(r['Weekly Consumption of Ambulances using Diesel - Normal']) + n(r['Weekly Consumption of Ambulances using Diesel - Super']);
+      const petrol = n(r['Weekly Consumption of Ambulances using Petrol 92']) + n(r['Weekly Consumption of Ambulances using Petrol 95']);
+      const ov = n(r['Number of other vehicles using Diesel - Normal']) + n(r['Number of other vehicles using Diesel - Super']) + n(r['Number of other vehicles using Petrol 92']) + n(r['Number of other vehicles using Petrol 95']);
+      const gen = n(r['Number of Generators using Diesel - Normal']) + n(r['Number of Generators using Petrol 92']);
+      html += `<tr class="${isDup ? 'is-dup' : ''}"><td style="font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r['Institution Name'] || ''}">${r['Institution Name'] || '—'}</td><td>${r['Ministry/ Province'] || '—'}</td><td>${r['RDHS'] || '—'}</td><td><strong style="color:#c0392b">${n(r['Total number of operational Ambulances'])}</strong></td><td>${diesel ? diesel.toLocaleString(undefined, {maximumFractionDigits:1}) : '—'}</td><td>${petrol ? petrol.toLocaleString(undefined, {maximumFractionDigits:1}) : '—'}</td><td>${ov || '—'}</td><td>${gen || '—'}</td><td style="font-size:12px;color:#888">${r['Focal Point Name'] || '—'}</td></tr>`;
     });
-    html+='</tbody></table>';
-  } else if(currentTab==='amb'){
-    html='<table><thead><tr><th onclick="doSort(\'Institution Name\')">Institution</th><th>Total</th><th>Diesel Normal</th><th>Wk (L)</th><th>Diesel Super</th><th>Wk (L)</th><th>Petrol 92</th><th>Wk (L)</th><th>Petrol 95</th><th>Wk (L)</th><th>Fuel Mix</th></tr></thead><tbody>';
-    pd.forEach(r=>{
-      const d1=n(r['Number of Ambulances using Diesel - Normal']),wd1=n(r['Weekly Consumption of Ambulances using Diesel - Normal']);
-      const d2=n(r['Number of Ambulances using Diesel - Super']),wd2=n(r['Weekly Consumption of Ambulances using Diesel - Super']);
-      const p1=n(r['Number of Ambulances using Petrol 92']),wp1=n(r['Weekly Consumption of Ambulances using Petrol 92']);
-      const p2=n(r['Number of Ambulances using Petrol 95']),wp2=n(r['Weekly Consumption of Ambulances using Petrol 95']);
-      const tot=d1+d2+p1+p2||1;
-      html+=`<tr><td style="font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r['Institution Name']||'—'}</td><td><strong style="color:#c0392b">${n(r['Total number of operational Ambulances'])}</strong></td><td>${d1?'<span class="badge badge-diesel">'+d1+'</span>':'—'}</td><td>${wd1||'—'}</td><td>${d2?'<span class="badge badge-super">'+d2+'</span>':'—'}</td><td>${wd2||'—'}</td><td>${p1?'<span class="badge badge-petrol">'+p1+'</span>':'—'}</td><td>${wp1||'—'}</td><td>${p2?'<span class="badge badge-petrol95">'+p2+'</span>':'—'}</td><td>${wp2||'—'}</td><td><div class="fuel-bar-wrap">${d1?'<div class="fuel-seg" style="background:#e74c3c;width:'+Math.round(d1/tot*100)+'%"></div>':''}${d2?'<div class="fuel-seg" style="background:#e67e22;width:'+Math.round(d2/tot*100)+'%"></div>':''}${p1?'<div class="fuel-seg" style="background:#27ae60;width:'+Math.round(p1/tot*100)+'%"></div>':''}${p2?'<div class="fuel-seg" style="background:#2980b9;width:'+Math.round(p2/tot*100)+'%"></div>':''}</div></td></tr>`;
+    html += '</tbody></table>';
+  } else if (currentTab === 'amb') {
+    html = '<table><thead><tr><th onclick="doSort(\'Institution Name\')">Institution</th><th>Total</th><th>Diesel Normal</th><th>Wk (L)</th><th>Diesel Super</th><th>Wk (L)</th><th>Petrol 92</th><th>Wk (L)</th><th>Petrol 95</th><th>Wk (L)</th><th>Fuel Mix</th></tr></thead><tbody>';
+    pd.forEach(r => {
+      const isDup = dupSet.has(r.__idx);
+      const d1 = n(r['Number of Ambulances using Diesel - Normal']), wd1 = n(r['Weekly Consumption of Ambulances using Diesel - Normal']);
+      const d2 = n(r['Number of Ambulances using Diesel - Super']), wd2 = n(r['Weekly Consumption of Ambulances using Diesel - Super']);
+      const p1 = n(r['Number of Ambulances using Petrol 92']), wp1 = n(r['Weekly Consumption of Ambulances using Petrol 92']);
+      const p2 = n(r['Number of Ambulances using Petrol 95']), wp2 = n(r['Weekly Consumption of Ambulances using Petrol 95']);
+      const tot = d1 + d2 + p1 + p2 || 1;
+      html += `<tr class="${isDup ? 'is-dup' : ''}"><td style="font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r['Institution Name'] || '—'}</td><td><strong style="color:#c0392b">${n(r['Total number of operational Ambulances'])}</strong></td><td>${d1 ? '<span class="badge badge-diesel">' + d1 + '</span>' : '—'}</td><td>${wd1 || '—'}</td><td>${d2 ? '<span class="badge badge-super">' + d2 + '</span>' : '—'}</td><td>${wd2 || '—'}</td><td>${p1 ? '<span class="badge badge-petrol">' + p1 + '</span>' : '—'}</td><td>${wp1 || '—'}</td><td>${p2 ? '<span class="badge badge-petrol95">' + p2 + '</span>' : '—'}</td><td>${wp2 || '—'}</td><td><div class="fuel-bar-wrap">${d1 ? '<div class="fuel-seg" style="background:#e74c3c;width:' + Math.round(d1 / tot * 100) + '%"></div>' : ''}${d2 ? '<div class="fuel-seg" style="background:#e67e22;width:' + Math.round(d2 / tot * 100) + '%"></div>' : ''}${p1 ? '<div class="fuel-seg" style="background:#27ae60;width:' + Math.round(p1 / tot * 100) + '%"></div>' : ''}${p2 ? '<div class="fuel-seg" style="background:#2980b9;width:' + Math.round(p2 / tot * 100) + '%"></div>' : ''}</div></td></tr>`;
     });
-    html+='</tbody></table>';
-  } else if(currentTab==='other'){
-    html='<table><thead><tr><th onclick="doSort(\'Institution Name\')">Institution</th><th onclick="doSort(\'Ministry/ Province\')">Province</th><th>Diesel Norm</th><th>Wk (L)</th><th>Diesel Super</th><th>Wk (L)</th><th>Petrol 92</th><th>Wk (L)</th><th>Petrol 95</th><th>Wk (L)</th><th>Vehicle Types</th></tr></thead><tbody>';
-    pd.forEach(r=>{
-      html+=`<tr><td style="font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r['Institution Name']||'—'}</td><td>${r['Ministry/ Province']||'—'}</td><td>${n(r['Number of other vehicles using Diesel - Normal'])||'—'}</td><td>${n(r['Weekly Consumption of other vehicles using Diesel - Normal'])||'—'}</td><td>${n(r['Number of other vehicles using Diesel - Super'])||'—'}</td><td>${n(r['Weekly Consumption of other vehicles using Diesel - Super'])||'—'}</td><td>${n(r['Number of other vehicles using Petrol 92'])||'—'}</td><td>${n(r['Weekly Consumption of other vehicles using Petrol 92'])||'—'}</td><td>${n(r['Number of other vehicles using Petrol 95'])||'—'}</td><td>${n(r['Weekly Consumption of other vehicles using Petrol 95'])||'—'}</td><td style="font-size:11px;color:#888;max-width:140px;overflow:hidden;text-overflow:ellipsis">${r['What are the types of other vehicles that you are mentioning above?']||'—'}</td></tr>`;
+    html += '</tbody></table>';
+  } else if (currentTab === 'other') {
+    html = '<table><thead><tr><th onclick="doSort(\'Institution Name\')">Institution</th><th onclick="doSort(\'Ministry/ Province\')">Province</th><th>Diesel Norm</th><th>Wk (L)</th><th>Diesel Super</th><th>Wk (L)</th><th>Petrol 92</th><th>Wk (L)</th><th>Petrol 95</th><th>Wk (L)</th><th>Vehicle Types</th></tr></thead><tbody>';
+    pd.forEach(r => {
+      const isDup = dupSet.has(r.__idx);
+      html += `<tr class="${isDup ? 'is-dup' : ''}"><td style="font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r['Institution Name'] || '—'}</td><td>${r['Ministry/ Province'] || '—'}</td><td>${n(r['Number of other vehicles using Diesel - Normal']) || '—'}</td><td>${n(r['Weekly Consumption of other vehicles using Diesel - Normal']) || '—'}</td><td>${n(r['Number of other vehicles using Diesel - Super']) || '—'}</td><td>${n(r['Weekly Consumption of other vehicles using Diesel - Super']) || '—'}</td><td>${n(r['Number of other vehicles using Petrol 92']) || '—'}</td><td>${n(r['Weekly Consumption of other vehicles using Petrol 92']) || '—'}</td><td>${n(r['Number of other vehicles using Petrol 95']) || '—'}</td><td>${n(r['Weekly Consumption of other vehicles using Petrol 95']) || '—'}</td><td style="font-size:11px;color:#888;max-width:140px;overflow:hidden;text-overflow:ellipsis">${r['What are the types of other vehicles that you are mentioning above?'] || '—'}</td></tr>`;
     });
-    html+='</tbody></table>';
+    html += '</tbody></table>';
   } else {
-    html='<table><thead><tr><th onclick="doSort(\'Institution Name\')">Institution</th><th onclick="doSort(\'Ministry/ Province\')">Province</th><th onclick="doSort(\'RDHS\')">RDHS</th><th>Diesel Gens</th><th>Capacity</th><th>Petrol 92 Gens</th><th>Capacity</th><th>Remarks</th></tr></thead><tbody>';
-    pd.forEach(r=>{
-      html+=`<tr><td style="font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r['Institution Name']||'—'}</td><td>${r['Ministry/ Province']||'—'}</td><td>${r['RDHS']||'—'}</td><td><strong>${n(r['Number of Generators using Diesel - Normal'])||'—'}</strong></td><td>${r['Capacity of Generators using Diesel - Normal']||'—'}</td><td><strong>${n(r['Number of Generators using Petrol 92'])||'—'}</strong></td><td>${r['Capacity of Generators using Petrol 92']||'—'}</td><td style="font-size:11px;color:#888">${r['Generators - Any other remarks']||'—'}</td></tr>`;
+    html = '<table><thead><tr><th onclick="doSort(\'Institution Name\')">Institution</th><th onclick="doSort(\'Ministry/ Province\')">Province</th><th onclick="doSort(\'RDHS\')">RDHS</th><th>Diesel Gens</th><th>Capacity</th><th>Petrol 92 Gens</th><th>Capacity</th><th>Remarks</th></tr></thead><tbody>';
+    pd.forEach(r => {
+      const isDup = dupSet.has(r.__idx);
+      html += `<tr class="${isDup ? 'is-dup' : ''}"><td style="font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r['Institution Name'] || '—'}</td><td>${r['Ministry/ Province'] || '—'}</td><td>${r['RDHS'] || '—'}</td><td><strong>${n(r['Number of Generators using Diesel - Normal']) || '—'}</strong></td><td>${r['Capacity of Generators using Diesel - Normal'] || '—'}</td><td><strong>${n(r['Number of Generators using Petrol 92']) || '—'}</strong></td><td>${r['Capacity of Generators using Petrol 92'] || '—'}</td><td style="font-size:11px;color:#888">${r['Generators - Any other remarks'] || '—'}</td></tr>`;
     });
-    html+='</tbody></table>';
+    html += '</tbody></table>';
   }
-  wrap.innerHTML=html;
+  wrap.innerHTML = html;
   renderPagination(data.length);
 }
 
-function renderPagination(total){
-  const pages=Math.ceil(total/PAGE_SIZE);
-  const s=(page-1)*PAGE_SIZE+1,e=Math.min(page*PAGE_SIZE,total);
-  let btns='';
-  for(let i=1;i<=pages;i++){
-    if(i===1||i===pages||Math.abs(i-page)<=1)btns+=`<button class="page-btn ${i===page?'active':''}" onclick="goPage(${i})">${i}</button>`;
-    else if(!btns.endsWith('>&#8230;</span>'))btns+='<span style="padding:4px 6px;font-size:12px;color:#aaa">&#8230;</span>';
+function renderPagination(total) {
+  const pages = Math.ceil(total / PAGE_SIZE);
+  const s = (page - 1) * PAGE_SIZE + 1, e = Math.min(page * PAGE_SIZE, total);
+  let btns = '';
+  for (let i = 1; i <= pages; i++) {
+    if (i === 1 || i === pages || Math.abs(i - page) <= 1) btns += `<button class="page-btn ${i === page ? 'active' : ''}" onclick="goPage(${i})">${i}</button>`;
+    else if (!btns.endsWith('>&#8230;</span>')) btns += '<span style="padding:4px 6px;font-size:12px;color:#aaa">&#8230;</span>';
   }
-  document.getElementById('paginationBar').innerHTML=`<span class="page-info">Showing ${s}&#8211;${e} of ${total} records</span><div class="page-btns">${btns}</div>`;
+  document.getElementById('paginationBar').innerHTML = `<span class="page-info">Showing ${s}&#8211;${e} of ${total} records</span><div class="page-btns">${btns}</div>`;
 }
 
-function goPage(p){page=p;renderTable();}
+function goPage(p) { page = p; renderTable(); }
 
-function exportCSV(){
-  if(!filtered.length)return;
-  const keys=Object.keys(filtered[0]);
-  const lines=[keys.join(','),...filtered.map(r=>keys.map(k=>'"'+(r[k]||'').replace(/"/g,'""')+'"').join(','))];
-  const blob=new Blob([lines.join('\n')],{type:'text/csv'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='fleet_fuel_data_'+new Date().toISOString().slice(0,10)+'.csv';
+function exportCSV() {
+  if (!filtered.length) return;
+  const keys = Object.keys(filtered[0]).filter(k => k !== '__idx');
+  const lines = [keys.join(','), ...filtered.map(r => keys.map(k => '"' + (r[k] || '').replace(/"/g, '""') + '"').join(','))];
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'fleet_fuel_data_' + new Date().toISOString().slice(0, 10) + '.csv';
   a.click();
 }
 
-function copyAllData(){
-  if(!filtered.length)return;
-  const keys=Object.keys(filtered[0]);
-  const text=[keys.join('\t'),...filtered.map(r=>keys.map(k=>r[k]||'').join('\t'))].join('\n');
-  navigator.clipboard.writeText(text).then(()=>alert('Copied! You can now paste it into Excel or Google Sheets.'));
+function copyAllData() {
+  if (!filtered.length) return;
+  const keys = Object.keys(filtered[0]).filter(k => k !== '__idx');
+  const text = [keys.join('\t'), ...filtered.map(r => keys.map(k => r[k] || '').join('\t'))].join('\n');
+  navigator.clipboard.writeText(text).then(() => alert('Copied! You can now paste it into Excel or Google Sheets.'));
 }
 
-function setStatus(type,msg){
-  document.getElementById('statusDot').className='dot'+(type==='loading'?' loading':type==='error'?' error':'');
-  document.getElementById('statusText').textContent=msg;
+function setStatus(type, msg) {
+  document.getElementById('statusDot').className = 'dot' + (type === 'loading' ? ' loading' : type === 'error' ? ' error' : '');
+  document.getElementById('statusText').textContent = msg;
 }
-function sh(s,max){return s&&s.length>max?s.slice(0,max-1)+'&#8230;':s;}
+function sh(s, max) { return s && s.length > max ? s.slice(0, max - 1) + '&#8230;' : s; }
 </script>
 </body>
 </html>
