@@ -8,7 +8,6 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f4f5f7;color:#1a1a1a;font-size:14px}
-
 .navbar{background:#c0392b;color:white;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:56px;box-shadow:0 2px 8px rgba(0,0,0,0.15)}
 .navbar-brand{display:flex;align-items:center;gap:12px}
 .navbar-icon{width:32px;height:32px;background:rgba(255,255,255,0.2);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:18px}
@@ -21,7 +20,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .dot.error{background:#ff6b6b}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
 #lastUpdate{font-size:11px;opacity:0.75}
-
+.refresh-badge{background:rgba(255,255,255,0.15);padding:4px 10px;border-radius:20px;font-size:11px;display:flex;align-items:center;gap:5px}
+.refresh-countdown{font-weight:700;color:#2ecc71;min-width:14px;display:inline-block;text-align:center}
 .url-bar{background:white;border-bottom:1px solid #e0e0e0;padding:10px 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .url-label{font-size:12px;font-weight:500;color:#666;white-space:nowrap}
 .url-input{flex:1;min-width:260px;padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:12px;color:#333;outline:none}
@@ -32,21 +32,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .btn-gray{background:#f0f0f0;color:#444;border:1px solid #ddd}
 .btn-gray:hover{background:#e5e5e5}
 .btn-sm{padding:5px 12px;font-size:11px}
-
 .main{padding:20px 24px;max-width:1400px;margin:0 auto}
-
 .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
-.metric-card{background:white;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.07)}
+.metric-card{background:white;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.07);transition:transform .2s}
+.metric-card:hover{transform:translateY(-2px)}
 .metric-label{font-size:11px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px}
 .metric-value{font-size:28px;font-weight:700;line-height:1;margin-bottom:4px}
 .metric-sub{font-size:11px;color:#aaa}
-.mv-red{color:#c0392b}
-.mv-amber{color:#e67e22}
-.mv-green{color:#27ae60}
-.mv-blue{color:#2980b9}
-.mv-purple{color:#8e44ad}
-.mv-teal{color:#16a085}
-
+.mv-red{color:#c0392b}.mv-amber{color:#e67e22}.mv-green{color:#27ae60}.mv-blue{color:#2980b9}.mv-purple{color:#8e44ad}.mv-teal{color:#16a085}
 .charts-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:20px}
 .chart-card{background:white;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.07)}
 .chart-card-title{font-size:12px;font-weight:600;color:#555;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.04em}
@@ -54,7 +47,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
 .legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:#555}
 .legend-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
-
 .table-section{background:white;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,0.07);overflow:hidden;margin-bottom:20px}
 .table-toolbar{padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:1px solid #f0f0f0;background:#fafafa}
 .toolbar-title{font-size:13px;font-weight:600;color:#333;flex-shrink:0}
@@ -62,11 +54,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .search-box:focus{border-color:#c0392b}
 .filter-sel{padding:7px 10px;border:1px solid #ddd;border-radius:6px;font-size:12px;background:white;outline:none;cursor:pointer}
 .spacer{flex:1}
-
 .tabs{display:flex;gap:2px;background:#f0f0f0;border-radius:6px;padding:3px;margin:10px 16px 12px}
 .tab{flex:1;text-align:center;padding:6px 10px;font-size:12px;font-weight:500;cursor:pointer;border-radius:4px;color:#666;transition:all 0.15s}
 .tab.active{background:white;color:#c0392b;box-shadow:0 1px 3px rgba(0,0,0,0.1)}
-
 .table-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse}
 thead th{padding:10px 14px;text-align:left;font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.04em;border-bottom:2px solid #f0f0f0;white-space:nowrap;cursor:pointer;user-select:none;background:#fafafa}
@@ -74,30 +64,26 @@ thead th:hover{color:#c0392b}
 tbody td{padding:10px 14px;border-bottom:1px solid #f5f5f5;font-size:13px;color:#333;vertical-align:middle}
 tbody tr:hover td{background:#fff8f8}
 tbody tr:last-child td{border-bottom:none}
-
 .badge{display:inline-block;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:600}
 .badge-diesel{background:#fef3cd;color:#856404}
 .badge-super{background:#fde8d8;color:#7a3000}
 .badge-petrol{background:#d4edda;color:#155724}
 .badge-petrol95{background:#cce5ff;color:#004085}
-
 .fuel-bar-wrap{display:flex;height:6px;border-radius:3px;overflow:hidden;gap:1px;width:80px}
 .fuel-seg{height:100%}
-
 .pagination{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #f0f0f0;background:#fafafa}
 .page-info{font-size:12px;color:#888}
 .page-btns{display:flex;gap:4px}
 .page-btn{padding:4px 10px;border:1px solid #e0e0e0;border-radius:4px;background:white;color:#555;cursor:pointer;font-size:12px;transition:all 0.1s}
 .page-btn:hover{border-color:#c0392b;color:#c0392b}
 .page-btn.active{background:#c0392b;color:white;border-color:#c0392b}
-
 .empty-state{padding:48px;text-align:center;color:#aaa}
 .empty-icon{font-size:32px;margin-bottom:12px}
 .empty-text{font-size:14px}
 .empty-sub{font-size:12px;margin-top:6px;color:#ccc}
-
+.flash{animation:flashGreen .8s ease}
+@keyframes flashGreen{0%{background:#d4edda}100%{background:white}}
 .footer{text-align:center;padding:20px;font-size:11px;color:#bbb}
-
 @media(max-width:600px){
   .navbar{padding:0 12px}
   .url-bar{padding:8px 12px}
@@ -121,7 +107,10 @@ tbody tr:last-child td{border-bottom:none}
   <div class="navbar-right">
     <div class="status-pill">
       <div class="dot" id="statusDot"></div>
-      <span id="statusText">Not connected</span>
+      <span id="statusText">Connecting...</span>
+    </div>
+    <div class="refresh-badge">
+      Next refresh: <span class="refresh-countdown" id="countdown">5</span>s
     </div>
     <span id="lastUpdate"></span>
   </div>
@@ -135,70 +124,25 @@ tbody tr:last-child td{border-bottom:none}
 </div>
 
 <div class="main">
-
   <div class="metrics">
-    <div class="metric-card">
-      <div class="metric-label">Institutions</div>
-      <div class="metric-value mv-blue" id="m-inst">—</div>
-      <div class="metric-sub">reporting</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">Total Ambulances</div>
-      <div class="metric-value mv-red" id="m-amb">—</div>
-      <div class="metric-sub">operational</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">Diesel / Week</div>
-      <div class="metric-value mv-amber" id="m-diesel">—</div>
-      <div class="metric-sub">litres (ambulances)</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">Petrol / Week</div>
-      <div class="metric-value mv-green" id="m-petrol">—</div>
-      <div class="metric-sub">litres (ambulances)</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">Other Vehicles</div>
-      <div class="metric-value mv-purple" id="m-other">—</div>
-      <div class="metric-sub">fleet count</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">Generators</div>
-      <div class="metric-value mv-teal" id="m-gen">—</div>
-      <div class="metric-sub">units</div>
-    </div>
+    <div class="metric-card"><div class="metric-label">Institutions</div><div class="metric-value mv-blue" id="m-inst">—</div><div class="metric-sub">reporting</div></div>
+    <div class="metric-card"><div class="metric-label">Total Ambulances</div><div class="metric-value mv-red" id="m-amb">—</div><div class="metric-sub">operational</div></div>
+    <div class="metric-card"><div class="metric-label">Diesel / Week</div><div class="metric-value mv-amber" id="m-diesel">—</div><div class="metric-sub">litres (ambulances)</div></div>
+    <div class="metric-card"><div class="metric-label">Petrol / Week</div><div class="metric-value mv-green" id="m-petrol">—</div><div class="metric-sub">litres (ambulances)</div></div>
+    <div class="metric-card"><div class="metric-label">Other Vehicles</div><div class="metric-value mv-purple" id="m-other">—</div><div class="metric-sub">fleet count</div></div>
+    <div class="metric-card"><div class="metric-label">Generators</div><div class="metric-value mv-teal" id="m-gen">—</div><div class="metric-sub">units</div></div>
   </div>
 
   <div class="charts-row">
-    <div class="chart-card">
-      <div class="chart-card-title">Fuel Type &mdash; Ambulances</div>
-      <div class="legend" id="fuelLegend"></div>
-      <div class="chart-wrap" style="height:200px"><canvas id="chartFuel"></canvas></div>
-    </div>
-    <div class="chart-card">
-      <div class="chart-card-title">Top 8 Institutions by Fleet Size</div>
-      <div class="chart-wrap" style="height:220px"><canvas id="chartFleet"></canvas></div>
-    </div>
-    <div class="chart-card">
-      <div class="chart-card-title">Weekly Fuel by Province / RDHS</div>
-      <div class="chart-wrap" style="height:220px"><canvas id="chartProvince"></canvas></div>
-    </div>
+    <div class="chart-card"><div class="chart-card-title">Fuel Type &mdash; Ambulances</div><div class="legend" id="fuelLegend"></div><div class="chart-wrap" style="height:200px"><canvas id="chartFuel"></canvas></div></div>
+    <div class="chart-card"><div class="chart-card-title">Top 8 Institutions by Fleet Size</div><div class="chart-wrap" style="height:220px"><canvas id="chartFleet"></canvas></div></div>
+    <div class="chart-card"><div class="chart-card-title">Weekly Fuel by Province / RDHS</div><div class="chart-wrap" style="height:220px"><canvas id="chartProvince"></canvas></div></div>
   </div>
 
   <div class="charts-row">
-    <div class="chart-card">
-      <div class="chart-card-title">Ambulances vs Other Vehicles vs Generators</div>
-      <div class="legend" id="vehicleLegend"></div>
-      <div class="chart-wrap" style="height:180px"><canvas id="chartVehicle"></canvas></div>
-    </div>
-    <div class="chart-card">
-      <div class="chart-card-title">Diesel vs Petrol Weekly Consumption (L)</div>
-      <div class="chart-wrap" style="height:200px"><canvas id="chartDvP"></canvas></div>
-    </div>
-    <div class="chart-card">
-      <div class="chart-card-title">Submissions Over Time</div>
-      <div class="chart-wrap" style="height:200px"><canvas id="chartTime"></canvas></div>
-    </div>
+    <div class="chart-card"><div class="chart-card-title">Ambulances vs Other Vehicles vs Generators</div><div class="legend" id="vehicleLegend"></div><div class="chart-wrap" style="height:180px"><canvas id="chartVehicle"></canvas></div></div>
+    <div class="chart-card"><div class="chart-card-title">Diesel vs Petrol Weekly Consumption (L)</div><div class="chart-wrap" style="height:200px"><canvas id="chartDvP"></canvas></div></div>
+    <div class="chart-card"><div class="chart-card-title">Submissions Over Time</div><div class="chart-wrap" style="height:200px"><canvas id="chartTime"></canvas></div></div>
   </div>
 
   <div class="table-section">
@@ -221,41 +165,64 @@ tbody tr:last-child td{border-bottom:none}
     <div class="pagination" id="paginationBar"></div>
   </div>
 
-  <div class="footer">Fleet Fuel Dashboard &mdash; Data sourced live from Google Sheets &mdash; Auto-refreshes every 30 seconds</div>
+  <div class="footer">Fleet Fuel Dashboard &mdash; Ministry of Health Sri Lanka &mdash; Auto-refreshes every 5 seconds from Google Sheets</div>
 </div>
 
 <script>
 // ══════════════════════════════════════════════════════
-// STEP 4 INSTRUCTION:
-// Replace the empty string below with your CSV URL
-// Example:
-// const DEFAULT_URL = 'https://docs.google.com/spreadsheets/d/1abc.../pub?gid=0&single=true&output=csv';
+// YOUR GOOGLE SHEET CSV URL
+// To change: replace the URL below with your new CSV URL
 // ══════════════════════════════════════════════════════
 const DEFAULT_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTCYJjyAjtAGT4seFkcRZmvdScTs0BYnfy8s905dMYkcKDQBEJL5OzxmR7v98ZDvGVlrO9j0l_h87gN/pub?output=csv';
 
-// ── STATE ──
+const REFRESH_MS = 5000;
+
 let allRows=[], filtered=[], currentTab='inst', page=1;
 const PAGE_SIZE=12;
-let sortCol=null, sortDir=1, charts={}, refreshTimer=null;
+let sortCol=null, sortDir=1, charts={}, refreshTimer=null, countdownTimer=null, countdownVal=5;
 
 // ── INIT ──
-window.onload=()=>{ if(DEFAULT_URL){document.getElementById('sheetUrl').value=DEFAULT_URL;loadData();}else{loadDemo();} };
+window.onload=()=>{
+  document.getElementById('sheetUrl').value=DEFAULT_URL;
+  loadData();
+};
 
-// ── CSV PARSER ──
+// ── COUNTDOWN ──
+function startCountdown(){
+  if(countdownTimer)clearInterval(countdownTimer);
+  countdownVal=Math.round(REFRESH_MS/1000);
+  document.getElementById('countdown').textContent=countdownVal;
+  countdownTimer=setInterval(()=>{
+    countdownVal--;
+    if(countdownVal<=0)countdownVal=Math.round(REFRESH_MS/1000);
+    document.getElementById('countdown').textContent=countdownVal;
+  },1000);
+}
+
+// ══════════════════════════════════════════════════════
+// FIX 1: CSV PARSER
+// Handles \r\n (Windows), \r (old Mac), \n (Unix)
+// Never drops valid rows
+// ══════════════════════════════════════════════════════
 function parseCsv(text){
-  const lines=text.trim().split('\n');
-  if(lines.length<2)return[];
-  const headers=splitLine(lines[0]);
-  const rows=[];
-  for(let i=1;i<lines.length;i++){
-    if(!lines[i].trim())continue;
-    const vals=splitLine(lines[i]);
-    const obj={};
-    headers.forEach((h,idx)=>{obj[h.trim()]=(vals[idx]||'').trim();});
-    rows.push(obj);
+  // Normalize ALL line endings first
+  const clean = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim();
+  const lines = clean.split('\n');
+  if(lines.length < 2) return [];
+  const headers = splitLine(lines[0]);
+  const rows = [];
+  for(let i=1; i<lines.length; i++){
+    const line = lines[i].trim();
+    if(!line) continue;
+    const vals = splitLine(lines[i]);
+    const obj = {};
+    headers.forEach((h,idx)=>{ obj[h.trim()] = (vals[idx]||'').trim(); });
+    // Only skip if the entire row is blank
+    if(Object.values(obj).some(v=>v!=='')) rows.push(obj);
   }
   return rows;
 }
+
 function splitLine(line){
   const res=[];let cur='';let inQ=false;
   for(let i=0;i<line.length;i++){
@@ -263,9 +230,33 @@ function splitLine(line){
     else if(line[i]===','&&!inQ){res.push(cur);cur='';}
     else{cur+=line[i];}
   }
-  res.push(cur);return res;
+  res.push(cur);
+  return res;
 }
-function n(v){const x=parseFloat(v);return isNaN(x)?0:x;}
+
+// Clean numeric values — strips stray \r and spaces
+function n(v){
+  if(v===null||v===undefined)return 0;
+  const x=parseFloat(String(v).replace(/[^0-9.\-]/g,''));
+  return isNaN(x)?0:x;
+}
+
+// ══════════════════════════════════════════════════════
+// FIX 2: FETCH with 3-layer cache bypass
+// Prevents browser from ever serving stale cached data
+// ══════════════════════════════════════════════════════
+async function fetchFresh(url){
+  const bust = url + (url.includes('?')?'&':'?') + '_t=' + Date.now();
+  const res = await fetch(bust, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: {
+      'Pragma': 'no-cache',
+      'Cache-Control': 'no-cache, no-store, must-revalidate'
+    }
+  });
+  return res;
+}
 
 // ── LOAD REAL SHEET ──
 async function loadData(){
@@ -275,58 +266,87 @@ async function loadData(){
   document.getElementById('loadBtnText').textContent='Loading...';
   setStatus('loading','Fetching data...');
   try{
-    const res=await fetch(url);
-    if(!res.ok)throw new Error('HTTP '+res.status+' — check the URL and make sure the sheet is published publicly');
-    const text=await res.text();
-    const rows=parseCsv(text);
-    if(!rows.length)throw new Error('No data rows found. Make sure your sheet has data in rows below the header.');
-    allRows=rows;
+    const res = await fetchFresh(url);
+    if(!res.ok) throw new Error('HTTP '+res.status+' — check the URL and make sure the sheet is published publicly');
+    const text = await res.text();
+    const rows = parseCsv(text);
+    if(!rows.length) throw new Error('No data rows found. Make sure your sheet has data below the header row.');
+    const prevCount = allRows.length;
+    allRows = rows;
     process();
-    setStatus('ok','Live — '+rows.length+' records loaded');
+    setStatus('ok','LIVE — '+rows.length+' records');
     document.getElementById('lastUpdate').textContent='Updated '+new Date().toLocaleTimeString();
+    if(prevCount>0 && rows.length!==prevCount){
+      flashCards();
+    }
     startRefresh(url);
+    startCountdown();
   }catch(e){
     setStatus('error','Error: '+e.message);
-    alert('Could not load sheet.\n\nError: '+e.message+'\n\nTips:\n1. Make sure you published the sheet (File > Share > Publish to web > CSV)\n2. Try the alternate URL: https://docs.google.com/spreadsheets/d/YOUR_ID/export?format=csv&gid=0\n3. Make sure the sheet is set to "Anyone with the link can view"');
+    alert('Could not load sheet.\n\nError: '+e.message+'\n\nHow to fix:\n1. Open your Google Sheet\n2. Click File > Share > Publish to web\n3. Select your sheet tab\n4. Choose CSV format\n5. Click Publish\n6. Copy the URL and paste it above');
   }
-  document.getElementById('loadBtnText').textContent='Load Sheet';
+  document.getElementById('loadBtnText').textContent='Reload Now';
 }
 
+// ══════════════════════════════════════════════════════
+// FIX 3: AUTO REFRESH — never replaces good data with bad
+// If new fetch returns fewer rows than current, keep current
+// ══════════════════════════════════════════════════════
 function startRefresh(url){
   if(refreshTimer)clearInterval(refreshTimer);
   refreshTimer=setInterval(async()=>{
     try{
-      const res=await fetch(url);
-      const text=await res.text();
-      const rows=parseCsv(text);
-      if(rows.length){
-        allRows=rows;process();
-        setStatus('ok','Auto-refreshed — '+rows.length+' records');
+      const res = await fetchFresh(url);
+      if(!res.ok) return;
+      const text = await res.text();
+      const rows = parseCsv(text);
+      // Safety check: only update if rows >= current count (prevents partial load overwriting good data)
+      if(rows.length > 0 && rows.length >= allRows.length){
+        const prevCount = allRows.length;
+        allRows = rows;
+        process();
+        setStatus('ok','LIVE — '+rows.length+' records');
         document.getElementById('lastUpdate').textContent='Updated '+new Date().toLocaleTimeString();
+        if(rows.length !== prevCount){
+          flashCards();
+        }
+      } else if(rows.length > 0 && rows.length < allRows.length){
+        // Got fewer rows — might be a partial Google response, just update status
+        setStatus('ok','LIVE — '+allRows.length+' records (refresh ok)');
+        document.getElementById('lastUpdate').textContent='Checked '+new Date().toLocaleTimeString();
       }
-    }catch(e){setStatus('error','Auto-refresh failed');}
-  },30000);
+    }catch(e){
+      setStatus('error','Refresh failed — retrying...');
+    }
+  },REFRESH_MS);
+}
+
+function flashCards(){
+  document.querySelectorAll('.metric-card').forEach(c=>{
+    c.classList.remove('flash');
+    void c.offsetWidth;
+    c.classList.add('flash');
+  });
 }
 
 // ── DEMO DATA ──
 function loadDemo(){
   allRows=[
-    {Timestamp:'2024-01-10','Ministry/ Province':'Western','RDHS':'Colombo','Institution Name':'National Hospital Colombo','Focal Point Name':'Dr. A. Silva','Total number of operational Ambulances':'8','Number of Ambulances using Diesel - Normal':'4','Weekly Consumption of Ambulances using Diesel - Normal':'320','Number of Ambulances using Diesel - Super':'1','Weekly Consumption of Ambulances using Diesel - Super':'60','Number of Ambulances using Petrol 92':'2','Weekly Consumption of Ambulances using Petrol 92':'100','Number of Ambulances using Petrol 95':'1','Weekly Consumption of Ambulances using Petrol 95':'55','Number of other vehicles using Diesel - Normal':'6','Weekly Consumption of other vehicles using Diesel - Normal':'240','Number of other vehicles using Petrol 92':'1','Weekly Consumption of other vehicles using Petrol 92':'40','Number of Generators using Diesel - Normal':'3','Capacity of Generators using Diesel - Normal':'15kVA','Number of Generators using Petrol 92':'1','Capacity of Generators using Petrol 92':'5kVA','Generators - Any other remarks':'Main backup'},
-    {Timestamp:'2024-01-10','Ministry/ Province':'Western','RDHS':'Colombo','Institution Name':'Kalubowila Teaching Hospital','Focal Point Name':'Dr. B. Perera','Total number of operational Ambulances':'5','Number of Ambulances using Diesel - Normal':'3','Weekly Consumption of Ambulances using Diesel - Normal':'210','Number of Ambulances using Diesel - Super':'0','Weekly Consumption of Ambulances using Diesel - Super':'0','Number of Ambulances using Petrol 92':'1','Weekly Consumption of Ambulances using Petrol 92':'70','Number of Ambulances using Petrol 95':'1','Weekly Consumption of Ambulances using Petrol 95':'65','Number of other vehicles using Diesel - Normal':'4','Weekly Consumption of other vehicles using Diesel - Normal':'180','Number of other vehicles using Petrol 92':'0','Weekly Consumption of other vehicles using Petrol 92':'0','Number of Generators using Diesel - Normal':'2','Capacity of Generators using Diesel - Normal':'10kVA','Number of Generators using Petrol 92':'0','Capacity of Generators using Petrol 92':'','Generators - Any other remarks':''},
-    {Timestamp:'2024-01-11','Ministry/ Province':'Central','RDHS':'Kandy','Institution Name':'Kandy Teaching Hospital','Focal Point Name':'Dr. C. Fernando','Total number of operational Ambulances':'6','Number of Ambulances using Diesel - Normal':'4','Weekly Consumption of Ambulances using Diesel - Normal':'280','Number of Ambulances using Diesel - Super':'0','Weekly Consumption of Ambulances using Diesel - Super':'0','Number of Ambulances using Petrol 92':'2','Weekly Consumption of Ambulances using Petrol 92':'120','Number of Ambulances using Petrol 95':'0','Weekly Consumption of Ambulances using Petrol 95':'0','Number of other vehicles using Diesel - Normal':'5','Weekly Consumption of other vehicles using Diesel - Normal':'200','Number of other vehicles using Petrol 92':'2','Weekly Consumption of other vehicles using Petrol 92':'80','Number of Generators using Diesel - Normal':'4','Capacity of Generators using Diesel - Normal':'20kVA','Number of Generators using Petrol 92':'0','Capacity of Generators using Petrol 92':'','Generators - Any other remarks':''},
-    {Timestamp:'2024-01-11','Ministry/ Province':'Southern','RDHS':'Galle','Institution Name':'Karapitiya Teaching Hospital','Focal Point Name':'Dr. D. Jayawardena','Total number of operational Ambulances':'7','Number of Ambulances using Diesel - Normal':'5','Weekly Consumption of Ambulances using Diesel - Normal':'350','Number of Ambulances using Diesel - Super':'1','Weekly Consumption of Ambulances using Diesel - Super':'70','Number of Ambulances using Petrol 92':'1','Weekly Consumption of Ambulances using Petrol 92':'60','Number of Ambulances using Petrol 95':'0','Weekly Consumption of Ambulances using Petrol 95':'0','Number of other vehicles using Diesel - Normal':'3','Weekly Consumption of other vehicles using Diesel - Normal':'120','Number of other vehicles using Petrol 92':'1','Weekly Consumption of other vehicles using Petrol 92':'35','Number of Generators using Diesel - Normal':'2','Capacity of Generators using Diesel - Normal':'12kVA','Number of Generators using Petrol 92':'1','Capacity of Generators using Petrol 92':'3kVA','Generators - Any other remarks':''},
-    {Timestamp:'2024-01-12','Ministry/ Province':'Northern','RDHS':'Jaffna','Institution Name':'Jaffna Teaching Hospital','Focal Point Name':'Dr. E. Rajapaksa','Total number of operational Ambulances':'4','Number of Ambulances using Diesel - Normal':'3','Weekly Consumption of Ambulances using Diesel - Normal':'180','Number of Ambulances using Diesel - Super':'0','Weekly Consumption of Ambulances using Diesel - Super':'0','Number of Ambulances using Petrol 92':'1','Weekly Consumption of Ambulances using Petrol 92':'55','Number of Ambulances using Petrol 95':'0','Weekly Consumption of Ambulances using Petrol 95':'0','Number of other vehicles using Diesel - Normal':'2','Weekly Consumption of other vehicles using Diesel - Normal':'90','Number of other vehicles using Petrol 92':'0','Weekly Consumption of other vehicles using Petrol 92':'0','Number of Generators using Diesel - Normal':'1','Capacity of Generators using Diesel - Normal':'8kVA','Number of Generators using Petrol 92':'0','Capacity of Generators using Petrol 92':'','Generators - Any other remarks':''},
-    {Timestamp:'2024-01-12','Ministry/ Province':'Eastern','RDHS':'Batticaloa','Institution Name':'Batticaloa Teaching Hospital','Focal Point Name':'Dr. F. Thilak','Total number of operational Ambulances':'3','Number of Ambulances using Diesel - Normal':'2','Weekly Consumption of Ambulances using Diesel - Normal':'140','Number of Ambulances using Diesel - Super':'0','Weekly Consumption of Ambulances using Diesel - Super':'0','Number of Ambulances using Petrol 92':'1','Weekly Consumption of Ambulances using Petrol 92':'60','Number of Ambulances using Petrol 95':'0','Weekly Consumption of Ambulances using Petrol 95':'0','Number of other vehicles using Diesel - Normal':'2','Weekly Consumption of other vehicles using Diesel - Normal':'80','Number of other vehicles using Petrol 92':'0','Weekly Consumption of other vehicles using Petrol 92':'0','Number of Generators using Diesel - Normal':'1','Capacity of Generators using Diesel - Normal':'6kVA','Number of Generators using Petrol 92':'0','Capacity of Generators using Petrol 92':'','Generators - Any other remarks':''},
-    {Timestamp:'2024-01-13','Ministry/ Province':'Western','RDHS':'Gampaha','Institution Name':'Negombo Hospital','Focal Point Name':'Dr. G. Ranasinghe','Total number of operational Ambulances':'5','Number of Ambulances using Diesel - Normal':'3','Weekly Consumption of Ambulances using Diesel - Normal':'200','Number of Ambulances using Diesel - Super':'1','Weekly Consumption of Ambulances using Diesel - Super':'65','Number of Ambulances using Petrol 92':'1','Weekly Consumption of Ambulances using Petrol 92':'50','Number of Ambulances using Petrol 95':'0','Weekly Consumption of Ambulances using Petrol 95':'0','Number of other vehicles using Diesel - Normal':'3','Weekly Consumption of other vehicles using Diesel - Normal':'110','Number of other vehicles using Petrol 92':'1','Weekly Consumption of other vehicles using Petrol 92':'30','Number of Generators using Diesel - Normal':'2','Capacity of Generators using Diesel - Normal':'10kVA','Number of Generators using Petrol 92':'0','Capacity of Generators using Petrol 92':'','Generators - Any other remarks':''},
-    {Timestamp:'2024-01-13','Ministry/ Province':'North Western','RDHS':'Kurunegala','Institution Name':'Kurunegala Teaching Hospital','Focal Point Name':'Dr. H. Wijesinghe','Total number of operational Ambulances':'6','Number of Ambulances using Diesel - Normal':'4','Weekly Consumption of Ambulances using Diesel - Normal':'260','Number of Ambulances using Diesel - Super':'0','Weekly Consumption of Ambulances using Diesel - Super':'0','Number of Ambulances using Petrol 92':'2','Weekly Consumption of Ambulances using Petrol 92':'110','Number of Ambulances using Petrol 95':'0','Weekly Consumption of Ambulances using Petrol 95':'0','Number of other vehicles using Diesel - Normal':'4','Weekly Consumption of other vehicles using Diesel - Normal':'160','Number of other vehicles using Petrol 92':'1','Weekly Consumption of other vehicles using Petrol 92':'45','Number of Generators using Diesel - Normal':'3','Capacity of Generators using Diesel - Normal':'15kVA','Number of Generators using Petrol 92':'0','Capacity of Generators using Petrol 92':'','Generators - Any other remarks':''},
-    {Timestamp:'2024-01-14','Ministry/ Province':'Sabaragamuwa','RDHS':'Ratnapura','Institution Name':'Ratnapura General Hospital','Focal Point Name':'Dr. I. Dissanayake','Total number of operational Ambulances':'4','Number of Ambulances using Diesel - Normal':'3','Weekly Consumption of Ambulances using Diesel - Normal':'190','Number of Ambulances using Diesel - Super':'0','Weekly Consumption of Ambulances using Diesel - Super':'0','Number of Ambulances using Petrol 92':'1','Weekly Consumption of Ambulances using Petrol 92':'65','Number of Ambulances using Petrol 95':'0','Weekly Consumption of Ambulances using Petrol 95':'0','Number of other vehicles using Diesel - Normal':'2','Weekly Consumption of other vehicles using Diesel - Normal':'75','Number of other vehicles using Petrol 92':'0','Weekly Consumption of other vehicles using Petrol 92':'0','Number of Generators using Diesel - Normal':'2','Capacity of Generators using Diesel - Normal':'8kVA','Number of Generators using Petrol 92':'0','Capacity of Generators using Petrol 92':'','Generators - Any other remarks':''},
-    {Timestamp:'2024-01-14','Ministry/ Province':'Uva','RDHS':'Badulla','Institution Name':'Badulla General Hospital','Focal Point Name':'Dr. J. Bandara','Total number of operational Ambulances':'3','Number of Ambulances using Diesel - Normal':'2','Weekly Consumption of Ambulances using Diesel - Normal':'150','Number of Ambulances using Diesel - Super':'1','Weekly Consumption of Ambulances using Diesel - Super':'55','Number of Ambulances using Petrol 92':'0','Weekly Consumption of Ambulances using Petrol 92':'0','Number of Ambulances using Petrol 95':'0','Weekly Consumption of Ambulances using Petrol 95':'0','Number of other vehicles using Diesel - Normal':'1','Weekly Consumption of other vehicles using Diesel - Normal':'50','Number of other vehicles using Petrol 92':'0','Weekly Consumption of other vehicles using Petrol 92':'0','Number of Generators using Diesel - Normal':'1','Capacity of Generators using Diesel - Normal':'5kVA','Number of Generators using Petrol 92':'0','Capacity of Generators using Petrol 92':'','Generators - Any other remarks':''}
+    {Timestamp:'2024-01-10','Ministry/ Province':'Western','RDHS':'Colombo','Institution Name':'National Hospital Colombo','Focal Point Name':'Dr. A. Silva','Total number of operational Ambulances':'8','Number of Ambulances using Diesel - Normal':'4','Weekly Consumption of Ambulances using Diesel - Normal':'320','Number of Ambulances using Diesel - Super':'1','Weekly Consumption of Ambulances using Diesel - Super':'60','Number of Ambulances using Petrol 92':'2','Weekly Consumption of Ambulances using Petrol 92':'100','Number of Ambulances using Petrol 95':'1','Weekly Consumption of Ambulances using Petrol 95':'55','Number of other vehicles using Diesel - Normal':'6','Weekly Consumption of other vehicles using Diesel - Normal':'240','Number of other vehicles using Diesel - Super':'0','Weekly Consumption of other vehicles using Diesel - Super':'0','Number of other vehicles using Petrol 92':'1','Weekly Consumption of other vehicles using Petrol 92':'40','Number of other vehicles using Petrol 95':'0','Weekly Consumption of other vehicles using Petrol 95':'0','What are the types of other vehicles that you are mentioning above?':'Office vehicles','Number of Generators using Diesel - Normal':'3','Capacity of Generators using Diesel - Normal':'15kVA','Number of Generators using Petrol 92':'1','Capacity of Generators using Petrol 92':'5kVA','Generators - Any other remarks':'Main backup'},
+    {Timestamp:'2024-01-10','Ministry/ Province':'Western','RDHS':'Colombo','Institution Name':'Kalubowila Teaching Hospital','Focal Point Name':'Dr. B. Perera','Total number of operational Ambulances':'5','Number of Ambulances using Diesel - Normal':'3','Weekly Consumption of Ambulances using Diesel - Normal':'210','Number of Ambulances using Diesel - Super':'0','Weekly Consumption of Ambulances using Diesel - Super':'0','Number of Ambulances using Petrol 92':'1','Weekly Consumption of Ambulances using Petrol 92':'70','Number of Ambulances using Petrol 95':'1','Weekly Consumption of Ambulances using Petrol 95':'65','Number of other vehicles using Diesel - Normal':'4','Weekly Consumption of other vehicles using Diesel - Normal':'180','Number of other vehicles using Diesel - Super':'0','Weekly Consumption of other vehicles using Diesel - Super':'0','Number of other vehicles using Petrol 92':'0','Weekly Consumption of other vehicles using Petrol 92':'0','Number of other vehicles using Petrol 95':'0','Weekly Consumption of other vehicles using Petrol 95':'0','What are the types of other vehicles that you are mentioning above?':'Office vehicles','Number of Generators using Diesel - Normal':'2','Capacity of Generators using Diesel - Normal':'10kVA','Number of Generators using Petrol 92':'0','Capacity of Generators using Petrol 92':'','Generators - Any other remarks':''},
+    {Timestamp:'2024-01-11','Ministry/ Province':'Central','RDHS':'Kandy','Institution Name':'Kandy Teaching Hospital','Focal Point Name':'Dr. C. Fernando','Total number of operational Ambulances':'6','Number of Ambulances using Diesel - Normal':'4','Weekly Consumption of Ambulances using Diesel - Normal':'280','Number of Ambulances using Diesel - Super':'0','Weekly Consumption of Ambulances using Diesel - Super':'0','Number of Ambulances using Petrol 92':'2','Weekly Consumption of Ambulances using Petrol 92':'120','Number of Ambulances using Petrol 95':'0','Weekly Consumption of Ambulances using Petrol 95':'0','Number of other vehicles using Diesel - Normal':'5','Weekly Consumption of other vehicles using Diesel - Normal':'200','Number of other vehicles using Diesel - Super':'0','Weekly Consumption of other vehicles using Diesel - Super':'0','Number of other vehicles using Petrol 92':'2','Weekly Consumption of other vehicles using Petrol 92':'80','Number of other vehicles using Petrol 95':'0','Weekly Consumption of other vehicles using Petrol 95':'0','What are the types of other vehicles that you are mentioning above?':'Office vehicles, buses','Number of Generators using Diesel - Normal':'4','Capacity of Generators using Diesel - Normal':'20kVA','Number of Generators using Petrol 92':'0','Capacity of Generators using Petrol 92':'','Generators - Any other remarks':''},
+    {Timestamp:'2024-01-11','Ministry/ Province':'Southern','RDHS':'Galle','Institution Name':'Karapitiya Teaching Hospital','Focal Point Name':'Dr. D. Jayawardena','Total number of operational Ambulances':'7','Number of Ambulances using Diesel - Normal':'5','Weekly Consumption of Ambulances using Diesel - Normal':'350','Number of Ambulances using Diesel - Super':'1','Weekly Consumption of Ambulances using Diesel - Super':'70','Number of Ambulances using Petrol 92':'1','Weekly Consumption of Ambulances using Petrol 92':'60','Number of Ambulances using Petrol 95':'0','Weekly Consumption of Ambulances using Petrol 95':'0','Number of other vehicles using Diesel - Normal':'3','Weekly Consumption of other vehicles using Diesel - Normal':'120','Number of other vehicles using Diesel - Super':'0','Weekly Consumption of other vehicles using Diesel - Super':'0','Number of other vehicles using Petrol 92':'1','Weekly Consumption of other vehicles using Petrol 92':'35','Number of other vehicles using Petrol 95':'0','Weekly Consumption of other vehicles using Petrol 95':'0','What are the types of other vehicles that you are mentioning above?':'Office vehicles','Number of Generators using Diesel - Normal':'2','Capacity of Generators using Diesel - Normal':'12kVA','Number of Generators using Petrol 92':'1','Capacity of Generators using Petrol 92':'3kVA','Generators - Any other remarks':''},
+    {Timestamp:'2024-01-12','Ministry/ Province':'Northern','RDHS':'Jaffna','Institution Name':'Jaffna Teaching Hospital','Focal Point Name':'Dr. E. Rajapaksa','Total number of operational Ambulances':'4','Number of Ambulances using Diesel - Normal':'3','Weekly Consumption of Ambulances using Diesel - Normal':'180','Number of Ambulances using Diesel - Super':'0','Weekly Consumption of Ambulances using Diesel - Super':'0','Number of Ambulances using Petrol 92':'1','Weekly Consumption of Ambulances using Petrol 92':'55','Number of Ambulances using Petrol 95':'0','Weekly Consumption of Ambulances using Petrol 95':'0','Number of other vehicles using Diesel - Normal':'2','Weekly Consumption of other vehicles using Diesel - Normal':'90','Number of other vehicles using Diesel - Super':'0','Weekly Consumption of other vehicles using Diesel - Super':'0','Number of other vehicles using Petrol 92':'0','Weekly Consumption of other vehicles using Petrol 92':'0','Number of other vehicles using Petrol 95':'0','Weekly Consumption of other vehicles using Petrol 95':'0','What are the types of other vehicles that you are mentioning above?':'Office vehicles','Number of Generators using Diesel - Normal':'1','Capacity of Generators using Diesel - Normal':'8kVA','Number of Generators using Petrol 92':'0','Capacity of Generators using Petrol 92':'','Generators - Any other remarks':''},
+    {Timestamp:'2024-01-12','Ministry/ Province':'Eastern','RDHS':'Batticaloa','Institution Name':'Batticaloa Teaching Hospital','Focal Point Name':'Dr. F. Thilak','Total number of operational Ambulances':'3','Number of Ambulances using Diesel - Normal':'2','Weekly Consumption of Ambulances using Diesel - Normal':'140','Number of Ambulances using Diesel - Super':'0','Weekly Consumption of Ambulances using Diesel - Super':'0','Number of Ambulances using Petrol 92':'1','Weekly Consumption of Ambulances using Petrol 92':'60','Number of Ambulances using Petrol 95':'0','Weekly Consumption of Ambulances using Petrol 95':'0','Number of other vehicles using Diesel - Normal':'2','Weekly Consumption of other vehicles using Diesel - Normal':'80','Number of other vehicles using Diesel - Super':'0','Weekly Consumption of other vehicles using Diesel - Super':'0','Number of other vehicles using Petrol 92':'0','Weekly Consumption of other vehicles using Petrol 92':'0','Number of other vehicles using Petrol 95':'0','Weekly Consumption of other vehicles using Petrol 95':'0','What are the types of other vehicles that you are mentioning above?':'Office vehicles','Number of Generators using Diesel - Normal':'1','Capacity of Generators using Diesel - Normal':'6kVA','Number of Generators using Petrol 92':'0','Capacity of Generators using Petrol 92':'','Generators - Any other remarks':''},
+    {Timestamp:'2024-01-13','Ministry/ Province':'Western','RDHS':'Gampaha','Institution Name':'Negombo Hospital','Focal Point Name':'Dr. G. Ranasinghe','Total number of operational Ambulances':'5','Number of Ambulances using Diesel - Normal':'3','Weekly Consumption of Ambulances using Diesel - Normal':'200','Number of Ambulances using Diesel - Super':'1','Weekly Consumption of Ambulances using Diesel - Super':'65','Number of Ambulances using Petrol 92':'1','Weekly Consumption of Ambulances using Petrol 92':'50','Number of Ambulances using Petrol 95':'0','Weekly Consumption of Ambulances using Petrol 95':'0','Number of other vehicles using Diesel - Normal':'3','Weekly Consumption of other vehicles using Diesel - Normal':'110','Number of other vehicles using Diesel - Super':'0','Weekly Consumption of other vehicles using Diesel - Super':'0','Number of other vehicles using Petrol 92':'1','Weekly Consumption of other vehicles using Petrol 92':'30','Number of other vehicles using Petrol 95':'0','Weekly Consumption of other vehicles using Petrol 95':'0','What are the types of other vehicles that you are mentioning above?':'Office vehicles','Number of Generators using Diesel - Normal':'2','Capacity of Generators using Diesel - Normal':'10kVA','Number of Generators using Petrol 92':'0','Capacity of Generators using Petrol 92':'','Generators - Any other remarks':''},
+    {Timestamp:'2024-01-13','Ministry/ Province':'North Western','RDHS':'Kurunegala','Institution Name':'Kurunegala Teaching Hospital','Focal Point Name':'Dr. H. Wijesinghe','Total number of operational Ambulances':'6','Number of Ambulances using Diesel - Normal':'4','Weekly Consumption of Ambulances using Diesel - Normal':'260','Number of Ambulances using Diesel - Super':'0','Weekly Consumption of Ambulances using Diesel - Super':'0','Number of Ambulances using Petrol 92':'2','Weekly Consumption of Ambulances using Petrol 92':'110','Number of Ambulances using Petrol 95':'0','Weekly Consumption of Ambulances using Petrol 95':'0','Number of other vehicles using Diesel - Normal':'4','Weekly Consumption of other vehicles using Diesel - Normal':'160','Number of other vehicles using Diesel - Super':'0','Weekly Consumption of other vehicles using Diesel - Super':'0','Number of other vehicles using Petrol 92':'1','Weekly Consumption of other vehicles using Petrol 92':'45','Number of other vehicles using Petrol 95':'0','Weekly Consumption of other vehicles using Petrol 95':'0','What are the types of other vehicles that you are mentioning above?':'Office vehicles, buses','Number of Generators using Diesel - Normal':'3','Capacity of Generators using Diesel - Normal':'15kVA','Number of Generators using Petrol 92':'0','Capacity of Generators using Petrol 92':'','Generators - Any other remarks':''},
+    {Timestamp:'2024-01-14','Ministry/ Province':'Sabaragamuwa','RDHS':'Ratnapura','Institution Name':'Ratnapura General Hospital','Focal Point Name':'Dr. I. Dissanayake','Total number of operational Ambulances':'4','Number of Ambulances using Diesel - Normal':'3','Weekly Consumption of Ambulances using Diesel - Normal':'190','Number of Ambulances using Diesel - Super':'0','Weekly Consumption of Ambulances using Diesel - Super':'0','Number of Ambulances using Petrol 92':'1','Weekly Consumption of Ambulances using Petrol 92':'65','Number of Ambulances using Petrol 95':'0','Weekly Consumption of Ambulances using Petrol 95':'0','Number of other vehicles using Diesel - Normal':'2','Weekly Consumption of other vehicles using Diesel - Normal':'75','Number of other vehicles using Diesel - Super':'0','Weekly Consumption of other vehicles using Diesel - Super':'0','Number of other vehicles using Petrol 92':'0','Weekly Consumption of other vehicles using Petrol 92':'0','Number of other vehicles using Petrol 95':'0','Weekly Consumption of other vehicles using Petrol 95':'0','What are the types of other vehicles that you are mentioning above?':'Office vehicles','Number of Generators using Diesel - Normal':'2','Capacity of Generators using Diesel - Normal':'8kVA','Number of Generators using Petrol 92':'0','Capacity of Generators using Petrol 92':'','Generators - Any other remarks':''},
+    {Timestamp:'2024-01-14','Ministry/ Province':'Uva','RDHS':'Badulla','Institution Name':'Badulla General Hospital','Focal Point Name':'Dr. J. Bandara','Total number of operational Ambulances':'3','Number of Ambulances using Diesel - Normal':'2','Weekly Consumption of Ambulances using Diesel - Normal':'150','Number of Ambulances using Diesel - Super':'1','Weekly Consumption of Ambulances using Diesel - Super':'55','Number of Ambulances using Petrol 92':'0','Weekly Consumption of Ambulances using Petrol 92':'0','Number of Ambulances using Petrol 95':'0','Weekly Consumption of Ambulances using Petrol 95':'0','Number of other vehicles using Diesel - Normal':'1','Weekly Consumption of other vehicles using Diesel - Normal':'50','Number of other vehicles using Diesel - Super':'0','Weekly Consumption of other vehicles using Diesel - Super':'0','Number of other vehicles using Petrol 92':'0','Weekly Consumption of other vehicles using Petrol 92':'0','Number of other vehicles using Petrol 95':'0','Weekly Consumption of other vehicles using Petrol 95':'0','What are the types of other vehicles that you are mentioning above?':'Office vehicles','Number of Generators using Diesel - Normal':'1','Capacity of Generators using Diesel - Normal':'5kVA','Number of Generators using Petrol 92':'0','Capacity of Generators using Petrol 92':'','Generators - Any other remarks':''}
   ];
   process();
-  setStatus('ok','Demo data loaded — paste your sheet URL above for live data');
+  setStatus('ok','Demo data loaded — your live Sheet URL is already connected above');
 }
 
-// ── PROCESS ──
 function process(){updateMetrics();updateCharts();populateFilters();applyFilters();}
 
 function updateMetrics(){
@@ -347,7 +367,6 @@ function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];
 
 function updateCharts(){
   const r=allRows;
-  // 1. Fuel doughnut
   const d1=r.reduce((s,x)=>s+n(x['Number of Ambulances using Diesel - Normal']),0);
   const d2=r.reduce((s,x)=>s+n(x['Number of Ambulances using Diesel - Super']),0);
   const p92=r.reduce((s,x)=>s+n(x['Number of Ambulances using Petrol 92']),0);
@@ -360,19 +379,16 @@ function updateCharts(){
   destroyChart('chartFuel');
   charts['chartFuel']=new Chart(document.getElementById('chartFuel'),{type:'doughnut',data:{labels:fL,datasets:[{data:fD,backgroundColor:fC,borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},cutout:'60%'}});
 
-  // 2. Top 8 fleet
   const sorted=[...r].sort((a,b)=>n(b['Total number of operational Ambulances'])-n(a['Total number of operational Ambulances'])).slice(0,8);
   destroyChart('chartFleet');
   charts['chartFleet']=new Chart(document.getElementById('chartFleet'),{type:'bar',data:{labels:sorted.map(x=>sh(x['Institution Name']||x['RDHS']||'?',15)),datasets:[{data:sorted.map(x=>n(x['Total number of operational Ambulances'])),backgroundColor:'#c0392b',borderRadius:4,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10}},grid:{display:false}},y:{ticks:{font:{size:10}},grid:{color:'#f5f5f5'}}}}});
 
-  // 3. Province fuel
   const pm={};
   r.forEach(x=>{const p=x['Ministry/ Province']||x['RDHS']||'Unknown';const w=n(x['Weekly Consumption of Ambulances using Diesel - Normal'])+n(x['Weekly Consumption of Ambulances using Diesel - Super'])+n(x['Weekly Consumption of Ambulances using Petrol 92'])+n(x['Weekly Consumption of Ambulances using Petrol 95']);pm[p]=(pm[p]||0)+w;});
   const pK=Object.keys(pm).slice(0,10);
   destroyChart('chartProvince');
   charts['chartProvince']=new Chart(document.getElementById('chartProvince'),{type:'bar',data:{labels:pK,datasets:[{data:pK.map(k=>pm[k]),backgroundColor:'#8e44ad',borderRadius:4,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10}},grid:{color:'#f5f5f5'}},y:{ticks:{font:{size:10}},grid:{display:false}}}}});
 
-  // 4. Vehicle doughnut
   const aT=r.reduce((s,x)=>s+n(x['Total number of operational Ambulances']),0);
   const oT=r.reduce((s,x)=>s+n(x['Number of other vehicles using Diesel - Normal'])+n(x['Number of other vehicles using Diesel - Super'])+n(x['Number of other vehicles using Petrol 92'])+n(x['Number of other vehicles using Petrol 95']),0);
   const gT=r.reduce((s,x)=>s+n(x['Number of Generators using Diesel - Normal'])+n(x['Number of Generators using Petrol 92']),0);
@@ -381,7 +397,6 @@ function updateCharts(){
   destroyChart('chartVehicle');
   charts['chartVehicle']=new Chart(document.getElementById('chartVehicle'),{type:'doughnut',data:{labels:vL,datasets:[{data:vD,backgroundColor:vC,borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},cutout:'55%'}});
 
-  // 5. Diesel vs Petrol
   const dTot=r.reduce((s,x)=>s+n(x['Weekly Consumption of Ambulances using Diesel - Normal'])+n(x['Weekly Consumption of Ambulances using Diesel - Super']),0);
   const pTot=r.reduce((s,x)=>s+n(x['Weekly Consumption of Ambulances using Petrol 92'])+n(x['Weekly Consumption of Ambulances using Petrol 95']),0);
   const odT=r.reduce((s,x)=>s+n(x['Weekly Consumption of other vehicles using Diesel - Normal']),0);
@@ -389,7 +404,6 @@ function updateCharts(){
   destroyChart('chartDvP');
   charts['chartDvP']=new Chart(document.getElementById('chartDvP'),{type:'bar',data:{labels:['Ambulances','Other Vehicles'],datasets:[{label:'Diesel',data:[dTot,odT],backgroundColor:'#e67e22',borderRadius:4},{label:'Petrol',data:[pTot,opT],backgroundColor:'#27ae60',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:11},boxWidth:10}}},scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'#f5f5f5'},ticks:{font:{size:10}}}}}});
 
-  // 6. Submissions over time
   const dm={};
   r.forEach(x=>{if(!x.Timestamp)return;const d=(x.Timestamp.split('T')[0]||x.Timestamp.split(' ')[0]||'').slice(0,10);if(d)dm[d]=(dm[d]||0)+1;});
   const dates=Object.keys(dm).sort();
@@ -397,7 +411,6 @@ function updateCharts(){
   charts['chartTime']=new Chart(document.getElementById('chartTime'),{type:'line',data:{labels:dates,datasets:[{label:'Submissions',data:dates.map(d=>dm[d]),borderColor:'#c0392b',backgroundColor:'rgba(192,57,43,0.08)',tension:0.3,fill:true,pointRadius:4,pointBackgroundColor:'#c0392b'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10}},grid:{display:false}},y:{ticks:{font:{size:10},stepSize:1},grid:{color:'#f5f5f5'}}}}});
 }
 
-// ── FILTERS ──
 function populateFilters(){
   const prov=[...new Set(allRows.map(r=>r['Ministry/ Province']).filter(Boolean))].sort();
   const rdhs=[...new Set(allRows.map(r=>r['RDHS']).filter(Boolean))].sort();
@@ -429,7 +442,7 @@ function doSort(col){if(sortCol===col)sortDir*=-1;else{sortCol=col;sortDir=1;}re
 function renderTable(){
   const wrap=document.getElementById('tableWrap');
   if(!filtered.length){
-    wrap.innerHTML='<div class="empty-state"><div class="empty-icon">&#128203;</div><div class="empty-text">No data loaded yet</div><div class="empty-sub">Paste your Google Sheet CSV URL above and click Load Sheet, or click Load Demo</div></div>';
+    wrap.innerHTML='<div class="empty-state"><div class="empty-icon">&#128203;</div><div class="empty-text">No data loaded yet</div><div class="empty-sub">Your Google Sheet URL is connected — data loads automatically on open</div></div>';
     document.getElementById('paginationBar').innerHTML='';return;
   }
   let data=[...filtered];
@@ -496,7 +509,6 @@ function renderPagination(total){
 
 function goPage(p){page=p;renderTable();}
 
-// ── EXPORT ──
 function exportCSV(){
   if(!filtered.length)return;
   const keys=Object.keys(filtered[0]);
@@ -507,6 +519,7 @@ function exportCSV(){
   a.download='fleet_fuel_data_'+new Date().toISOString().slice(0,10)+'.csv';
   a.click();
 }
+
 function copyAllData(){
   if(!filtered.length)return;
   const keys=Object.keys(filtered[0]);
@@ -514,7 +527,6 @@ function copyAllData(){
   navigator.clipboard.writeText(text).then(()=>alert('Copied! You can now paste it into Excel or Google Sheets.'));
 }
 
-// ── HELPERS ──
 function setStatus(type,msg){
   document.getElementById('statusDot').className='dot'+(type==='loading'?' loading':type==='error'?' error':'');
   document.getElementById('statusText').textContent=msg;
