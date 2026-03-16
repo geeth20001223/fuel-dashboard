@@ -142,7 +142,15 @@ tbody tr.is-dup td:first-child::after{content:' ⚠ dup';font-size:10px;color:#f
 
 <div class="main">
   <div class="metrics">
-    <div class="metric-card"><div class="metric-label">Institutions</div><div class="metric-value mv-blue" id="m-inst">—</div><div class="metric-sub" id="m-inst-sub">reporting</div></div>
+    <div class="metric-card" style="min-width:180px">
+      <div class="metric-label">Institutions</div>
+      <div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap">
+        <div class="metric-value mv-blue" id="m-inst">—</div>
+        <div id="m-inst-total" style="font-size:13px;color:#aaa;font-weight:500"></div>
+      </div>
+      <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap" id="m-inst-badges"></div>
+      <div class="metric-sub" id="m-inst-sub" style="margin-top:4px">reporting</div>
+    </div>
     <div class="metric-card"><div class="metric-label">Total Ambulances</div><div class="metric-value mv-red" id="m-amb">—</div><div class="metric-sub">operational</div></div>
     <div class="metric-card"><div class="metric-label">Diesel / Week</div><div class="metric-value mv-amber" id="m-diesel">—</div><div class="metric-sub">litres (ambulances)</div></div>
     <div class="metric-card"><div class="metric-label">Petrol / Week</div><div class="metric-value mv-green" id="m-petrol">—</div><div class="metric-sub">litres (ambulances)</div></div>
@@ -362,7 +370,8 @@ function updateDedupBar(dupCount, dupNames) {
   const msg = document.getElementById('dedupMsg');
   if (dupCount > 0) {
     bar.classList.add('show');
-    msg.textContent = dupCount + ' duplicate submission' + (dupCount > 1 ? 's' : '') + ' detected for: ' + dupNames.slice(0, 5).join(', ') + (dupNames.length > 5 ? ' …and ' + (dupNames.length - 5) + ' more' : '') + '. Toggle to count only unique institutions.';
+    const nameList = dupNames.slice(0, 4).join(', ') + (dupNames.length > 4 ? ' +' + (dupNames.length - 4) + ' more' : '');
+    msg.innerHTML = '<strong>' + dupCount + ' duplicate submission' + (dupCount > 1 ? 's' : '') + '</strong> detected &mdash; ' + nameList + '. Use the toggle to show only the latest entry per institution.';
   } else {
     bar.classList.remove('show');
   }
@@ -437,11 +446,32 @@ function process() { updateMetrics(); updateCharts(); populateFilters(); applyFi
 function updateMetrics() {
   const r = activeRows;
   const total = allRows.length;
-  const unique = allRows.length - dupSet.size;
-  document.getElementById('m-inst').textContent = dedupEnabled ? unique : total;
-  document.getElementById('m-inst-sub').textContent = dedupEnabled
-    ? 'unique institutions'
-    : total !== unique ? total + ' submissions (' + unique + ' unique)' : 'reporting';
+  const unique = total - dupSet.size;
+  const dups = dupSet.size;
+
+  // Main number: always show total submissions
+  document.getElementById('m-inst').textContent = total;
+
+  // Secondary: show unique count if different
+  const totalEl = document.getElementById('m-inst-total');
+  if (dups > 0) {
+    totalEl.textContent = '/ ' + unique + ' unique';
+  } else {
+    totalEl.textContent = '';
+  }
+
+  // Badges row
+  const badgesEl = document.getElementById('m-inst-badges');
+  if (dups > 0) {
+    badgesEl.innerHTML =
+      '<span style="background:#e3f2fd;color:#1565c0;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600">' + total + ' submissions</span>' +
+      '<span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600">' + unique + ' unique</span>' +
+      '<span style="background:#fff3e0;color:#e65100;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600">' + dups + ' dup' + (dups > 1 ? 's' : '') + '</span>';
+  } else {
+    badgesEl.innerHTML = '<span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600">' + total + ' submissions</span>';
+  }
+
+  document.getElementById('m-inst-sub').textContent = dedupEnabled ? 'showing unique only' : 'all submissions';
   document.getElementById('m-amb').textContent = r.reduce((s, x) => s + n(x['Total number of operational Ambulances']), 0);
   const diesel = r.reduce((s, x) => s + n(x['Weekly Consumption of Ambulances using Diesel - Normal']) + n(x['Weekly Consumption of Ambulances using Diesel - Super']), 0);
   const petrol = r.reduce((s, x) => s + n(x['Weekly Consumption of Ambulances using Petrol 92']) + n(x['Weekly Consumption of Ambulances using Petrol 95']), 0);
